@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        crystal: ["1.21", "latest"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Crystal
+        uses: crystal-lang/install-crystal@v1
+        with:
+          crystal: ${{ matrix.crystal }}
+
+      - name: Install shards
+        run: shards install --frozen
+
+      - name: Check formatting
+        run: crystal tool format --check
+
+      - name: Run specs
+        run: crystal spec --error-on-warnings
+
+      - name: Build release binary
+        run: shards build --release

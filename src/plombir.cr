@@ -2,9 +2,12 @@
 #
 # Philosophy: Write. Build. Ship.
 # Licensed under the Mozilla Public License 2.0 (MPL-2.0).
+require "./scaffold/templates"
+require "./scaffold/site"
 require "./cli/base"
 require "./cli/version"
 require "./cli/help"
+require "./cli/new"
 
 module Plombir
   VERSION = "0.1.0"

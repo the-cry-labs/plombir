@@ -10,7 +10,7 @@ module Plombir
           io << "  plombir <command> [options]\n"
           io << "\n"
           io << "Commands:\n"
-          io << "  new <name>   Create a new site (coming soon)\n"
+          io << "  new <name>   Create a new site\n"
           io << "  dev          Start the development server (coming soon)\n"
           io << "  build        Build the site into dist/ (coming soon)\n"
           io << "  preview      Serve the built site locally (coming soon)\n"
