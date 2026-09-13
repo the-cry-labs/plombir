@@ -1,0 +1,9 @@
+name: plombir
+version: 0.1.0
+
+authors:
+  - Subhan Gadirli <subhanqedirli@protonmail.com>
+
+crystal: '>= 1.21.0'
+
+license: MPL-2.0
