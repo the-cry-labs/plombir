@@ -23,20 +23,20 @@ shards build --release         # release binary (perf claims must use this)
 crystal spec                   # full test suite (must be green before any PR)
 crystal spec spec/router_spec.cr            # single file
 crystal spec --error-on-warnings            # CI mode — code must pass this
-crystal format --check         # must be green; run `crystal format` to fix
+crystal tool format --check    # must be green; run `crystal tool format` to fix
 ./bin/plombir --help
 ./bin/plombir --version
 ./bin/plombir new /tmp/demo && cd /tmp/demo && /path/to/bin/plombir build
 ```
 
-CI runs exactly: `shards install → crystal format --check → crystal spec --error-on-warnings → shards build --release`. If it fails locally, it fails in CI — fix locally first.
+CI runs exactly: `shards install → crystal tool format --check → crystal spec --error-on-warnings → shards build --release`. If it fails locally, it fails in CI — fix locally first.
 
 ## 3. Agent operating loop (mandatory)
 
 1. **Orient:** read `roadmap.md` active phase + this file + relevant `src/` + `spec/fixtures/`. Never assume — inspect with `read_files`/`search_codebase` first.
 2. **Plan:** state goal → scope → files to touch → tests to add → docs to update. One roadmap work-item per change. No drive-by refactors.
 3. **Implement thinly:** smallest vertical slice that satisfies acceptance criteria. Prefer simple implementation over abstraction (§39).
-4. **Verify:** `crystal format`, `crystal spec`, `shards build`, plus manual `new → build → preview/check` on a temp site. Paste evidence in PR/summary.
+4. **Verify:** `crystal tool format`, `crystal spec`, `shards build`, plus manual `new → build → preview/check` on a temp site. Paste evidence in PR/summary.
 5. **Document:** update phase checkboxes in `roadmap.md` only when gates pass; add ADR for any architectural choice; update `docs/*.md` + error gallery when behavior changes.
 6. **Leave clean:** no `TODO`/`FIXME` in user paths, no dead code, no commented-out blocks, no stray fixtures, `git status` minimal.
 
@@ -113,7 +113,7 @@ Rules: exit `0` ok / `1` user-project error / `2` usage error. `--verbose` may a
 - Error snapshots: each user-facing error has a spec asserting the full block (glyph, file:line[:col], snippet, hint). Minimum 15 cases by v1.0.
 - E2E: `spec/e2e/` runs real binaries in temp dirs (`new → build → check → preview` smoke). Keep under 60s total; quarantine flaky watcher tests with documented retry, never `sleep`-and-pray without justification.
 - Perf: any “fast” claim needs `docs/benchmarks.md` entry (machine, crystal flags, site size, cold/incremental). CI warns on +20% build-time regression.
-- Before PR: `crystal format`, `crystal spec --error-on-warnings`, `shards build`, manual temp-site smoke. Paste all four outputs.
+- Before PR: `crystal tool format`, `crystal spec --error-on-warnings`, `shards build`, manual temp-site smoke. Paste all four outputs.
 
 ## 8. Docs & ADR rules (§31)
 

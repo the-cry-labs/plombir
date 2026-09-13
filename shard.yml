@@ -6,4 +6,8 @@ authors:
 
 crystal: '>= 1.21.0'
 
+targets:
+  plombir:
+    main: src/main.cr
+
 license: MPL-2.0

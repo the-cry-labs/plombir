@@ -75,7 +75,7 @@ In scope:
 - `shard.yml` binary target, `src/plombir.cr` + `src/main.cr` (or `src/cli.cr`) entrypoint.
 - `plombir --version`, `-V`, `plombir --help`, `plombir version`.
 - Minimal `plombir new <name>` that generates the §4 structure.
-- Tooling: `crystal format --check`, `crystal spec`, `shards build`.
+- Tooling: `crystal tool format --check`, `crystal spec`, `shards build`.
 - CI: format + spec + build on Crystal 1.21.x (and `latest`), fast.
 - Rewrite `README.md` (§37), fix `.gitignore`, add `.editorconfig` coverage, `LICENSE` verify.
 - `spec/` harness + fixtures skeleton.
@@ -105,7 +105,7 @@ Out of scope: Markdown rendering, layouts, `build/dev`, watcher, templates, asse
    ```
    Minimal, modern, no bloat (§6). Must be runnable by Phase-1 `build` without edits.
 4. **README v0:** tagline, `Write. Build. Ship.`, quick start (3 commands), tiny example, features, dev (`shards install && shards build && crystal spec`), license badge/line. No wall of text.
-5. **CI:** `.github/workflows/ci.yml`: `shards install`, `crystal spec --error-on-warnings`, `crystal format --check`, `shards build --release`. Cache shards. Fail fast.
+5. **CI:** `.github/workflows/ci.yml`: `shards install`, `crystal spec --error-on-warnings`, `crystal tool format --check`, `shards build --release`. Cache shards. Fail fast.
 6. **Hygiene:** `.gitignore` must ignore `/bin/ /lib/ /.shards/ /dist/ *.dwarf`; `.editorconfig` already correct for `*.cr`; verify `LICENSE` is full MPL-2.0 text.
 
 ### 3.3 Acceptance criteria
@@ -113,7 +113,7 @@ Out of scope: Markdown rendering, layouts, `build/dev`, watcher, templates, asse
 - [ ] `shards build` produces `bin/plombir`; `./bin/plombir --version` prints `plombir 0.1.0`.
 - [ ] `./bin/plombir --help` lists `new/dev/build/preview/check/clean/doctor` with one-line descriptions (unimplemented ones marked `coming soon` but exit 0 on help).
 - [ ] `plombir new my-site && ls my-site` matches structure above; no extra boilerplate.
-- [ ] `crystal spec` green; `crystal format --check` green; CI green.
+- [ ] `crystal spec` green; `crystal tool format --check` green; CI green.
 - [ ] README answers in <60s: what / why / quickstart / license.
 
 ### 3.4 Exit gate
@@ -343,7 +343,7 @@ Tag `v0.6.0-assets-seo`. `docs/assets.md` + `docs/seo.md` written.
 ### 9.2 v1.0 definition of done
 
 - [ ] All Phase 0–5 acceptance boxes ticked.
-- [ ] `crystal spec` green, `crystal format --check` green, CI green on `1.21.x`.
+- [ ] `crystal spec` green, `crystal tool format --check` green, CI green on `1.21.x`.
 - [ ] Fresh-user test: new user goes `new → dev → build → deploy dist/` in <10 min with no help.
 - [ ] No `TODO`/`FIXME` in user paths; error gallery in docs matches actual output.
 - [ ] Binary runs with zero runtime deps; `doctor` passes on clean checkout.
