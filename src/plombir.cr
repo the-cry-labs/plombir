@@ -2,6 +2,8 @@
 #
 # Philosophy: Write. Build. Ship.
 # Licensed under the Mozilla Public License 2.0 (MPL-2.0).
+require "yaml"
+require "./frontmatter/parser"
 require "./scaffold/templates"
 require "./scaffold/site"
 require "./cli/base"
