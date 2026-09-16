@@ -28,6 +28,16 @@ describe Plombir::Content do
     end
   end
 
+  it "records the file modification time for date defaults" do
+    with_tempdir do |dir|
+      write_content(dir, "index.md", "# Home\n")
+
+      page = Plombir::Content.discover(dir).first
+      page.mtime.should be_a(Time)
+      page.mtime.should be <= Time.local
+    end
+  end
+
   it "returns empty when content is missing" do
     with_tempdir do |dir|
       Plombir::Content.discover(dir).should be_empty

@@ -5,13 +5,15 @@
 # (the future `plombir build --drafts` flag).
 module Plombir
   module Content
-    # One Markdown source: paths plus the frontmatter-declared draft flag.
+    # One Markdown source: paths, the frontmatter-declared draft flag,
+    # and the file modification time (the default `date:` — see ADR-002).
     struct Page
       getter source_path : String
       getter relative_path : String
       getter draft : Bool
+      getter mtime : Time
 
-      def initialize(@source_path : String, @relative_path : String, @draft : Bool)
+      def initialize(@source_path : String, @relative_path : String, @draft : Bool, @mtime : Time)
       end
     end
 
@@ -31,7 +33,7 @@ module Plombir
         relative = Path[path].relative_to(content_dir).to_s
         next if draft_path?(relative) && !drafts
 
-        pages << Page.new(path, relative, draft_path?(relative))
+        pages << Page.new(path, relative, draft_path?(relative), File.info(path).modification_time)
       end
       pages
     end
