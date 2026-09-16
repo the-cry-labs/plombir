@@ -16,17 +16,170 @@
 module Plombir
   module Frontmatter
     # A parsed document: raw YAML values plus the Markdown body.
+    #
+    # Derived metadata (`title`, `layout`, `date`, `tags`, `draft?`)
+    # applies the roadmap §11.5 defaults — see ADR-002. The source *file*
+    # and frontmatter *block_lines* are kept so value errors can report
+    # an exact `file:line` like every other Plombir diagnostic.
     struct Document
       getter data : Hash(String, YAML::Any)
       getter body : String
+      getter file : String
 
-      def initialize(@data : Hash(String, YAML::Any), @body : String)
+      def initialize(@data : Hash(String, YAML::Any), @body : String, @file : String = "<input>", @block_lines : Array(String) = [] of String)
       end
 
       # Returns the string value for *key*, or `nil` when absent.
       def string?(key : String) : String?
         value = @data[key]?
         value ? value.as_s? : nil
+      end
+
+      # Returns the page title: explicit `title:`, else the first
+      # `# heading`, else *filename_fallback* (usually the slug).
+      #
+      # ```
+      # doc.title("hello-world") # => "Hello, world"
+      # ```
+      def title(filename_fallback : String) : String
+        if raw = @data["title"]?.try(&.as_s?)
+          stripped = raw.strip
+          return stripped unless stripped.empty?
+        end
+        first_heading || filename_fallback
+      end
+
+      # Returns the layout name, defaulting to `"default"`.
+      #
+      # ```
+      # doc.layout # => "post"
+      # ```
+      def layout : String
+        raw = @data["layout"]?.try(&.as_s?).try(&.strip) || ""
+        raw.empty? ? "default" : raw
+      end
+
+      # Returns the page date: explicit `date:` (as `YYYY-MM-DD` or
+      # RFC3339, quoted or not), else *default* (the caller passes the
+      # file mtime — see ADR-002), else `nil`.
+      #
+      # ```
+      # doc.date(File.info(path).modification_time) # => 2026-09-13 00:00:00Z
+      # ```
+      def date(default : Time? = nil) : Time?
+        value = @data["date"]?
+        return default if value.nil? || value.raw.nil?
+        return value.as_time? if value.as_time?
+        if text = value.as_s?
+          if parsed = parse_date_string(text.strip)
+            return parsed
+          end
+        end
+        raise Error.new(@file, key_line("date"), date_message)
+      end
+
+      # Returns tags as a list: `tags: plombir` and the list form both
+      # work; a missing key means no tags.
+      #
+      # ```
+      # doc.tags # => ["plombir", "hello"]
+      # ```
+      def tags : Array(String)
+        value = @data["tags"]?
+        return [] of String if value.nil? || value.raw.nil?
+        if list = value.as_a?
+          return list.map { |entry| entry.as_s? || entry.to_s }
+        end
+        if text = value.as_s?
+          return [] of String if text.strip.empty?
+          return [text.strip]
+        end
+        raise Error.new(@file, key_line("tags"), tags_message)
+      end
+
+      # Returns whether the page is a draft (`draft: true`).
+      # Underscore paths are handled by `Plombir::Content.discover`.
+      #
+      # ```
+      # doc.draft? # => false
+      # ```
+      def draft? : Bool
+        value = @data["draft"]?
+        return false if value.nil? || value.raw.nil?
+        unless (bool = value.as_bool?).nil?
+          return bool
+        end
+        if text = value.as_s?
+          case text.strip.downcase
+          when "true"  then return true
+          when "false" then return false
+          end
+        end
+        raise Error.new(@file, key_line("draft"), draft_message)
+      end
+
+      # First `#`-style heading in the body, or `nil` when there is none.
+      private def first_heading : String?
+        body.each_line do |line|
+          if match = line.match(/^\s{0,3}\#{1,6}\s+(.+)$/)
+            text = match[1].sub(/\s+#+\s*$/, "").strip
+            return text unless text.empty?
+          end
+        end
+        nil
+      end
+
+      private def parse_date_string(text : String) : Time?
+        Time.parse(text, "%F", Time::Location::UTC)
+      rescue Time::Format::Error
+        begin
+          Time::Format::RFC_3339.parse(text)
+        rescue Time::Format::Error
+          nil
+        end
+      end
+
+      # 1-based file line of the `key:` entry, or 1 when unknown.
+      private def key_line(key : String) : Int32
+        @block_lines.each_with_index do |line, index|
+          return index + 2 if line =~ /^\s*#{Regex.escape(key)}\s*:/
+        end
+        1
+      end
+
+      # Raw `key: value` source line for error snippets.
+      private def key_source(key : String) : String
+        @block_lines.find { |line| line =~ /^\s*#{Regex.escape(key)}\s*:/ }.try(&.strip) || "#{key}: #{@data[key]}"
+      end
+
+      private def date_message : String
+        String.build do |io|
+          io << "✖ Invalid frontmatter\n\n"
+          io << @file << ":" << key_line("date") << "\n\n"
+          io << key_source("date") << "\n\n"
+          io << "Expected a date like YYYY-MM-DD or RFC3339.\n\n"
+          io << "Example:\ndate: 2026-09-13\n"
+        end
+      end
+
+      private def tags_message : String
+        String.build do |io|
+          io << "✖ Invalid frontmatter\n\n"
+          io << @file << ":" << key_line("tags") << "\n\n"
+          io << key_source("tags") << "\n\n"
+          io << "Expected a single value or a list of values.\n\n"
+          io << "Example:\ntags: plombir\n"
+        end
+      end
+
+      private def draft_message : String
+        String.build do |io|
+          io << "✖ Invalid frontmatter\n\n"
+          io << @file << ":" << key_line("draft") << "\n\n"
+          io << key_source("draft") << "\n\n"
+          io << "Expected true or false.\n\n"
+          io << "Example:\ndraft: true\n"
+        end
       end
     end
 
@@ -49,7 +202,7 @@ module Plombir
     # ```
     def self.parse(source : String, file : String = "<input>") : Document
       lines = source.lines
-      return Document.new({} of String => YAML::Any, source) unless opens?(lines)
+      return Document.new({} of String => YAML::Any, source, file) unless opens?(lines)
 
       closing = find_closing(lines)
       unless closing
@@ -58,7 +211,7 @@ module Plombir
 
       raw = lines[1...closing].join("\n")
       data = parse_yaml(raw, file, closing)
-      Document.new(data, lines[(closing + 1)..].join("\n"))
+      Document.new(data, lines[(closing + 1)..].join("\n"), file, lines[1...closing])
     end
 
     private def self.opens?(lines : Array(String)) : Bool
