@@ -42,7 +42,7 @@ module Plombir
 
         This is your new Plombir site. Edit `content/index.md` and rebuild.
 
-        - Read the [about page](/about/)
+        - Read the [about page](/pages/about/)
         - Read the [first post](/posts/hello-world/)
         MARKDOWN
       end

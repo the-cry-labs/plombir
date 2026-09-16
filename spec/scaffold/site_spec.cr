@@ -44,15 +44,38 @@ describe Plombir::Scaffold::Site do
     end
   end
 
-  it "rejects blank and nested names" do
+  it "rejects blank names and parent traversal" do
     with_tempdir do |dir|
       expect_raises(Plombir::Scaffold::Site::Error, /blank/) do
         Plombir::Scaffold::Site.new("  ", dir).create
       end
 
-      expect_raises(Plombir::Scaffold::Site::Error, /single directory name/) do
-        Plombir::Scaffold::Site.new("a/b", dir).create
+      expect_raises(Plombir::Scaffold::Site::Error, /\.\./) do
+        Plombir::Scaffold::Site.new("a/../b", dir).create
       end
+    end
+  end
+
+  it "accepts nested and absolute paths, rendering the base name" do
+    with_tempdir do |dir|
+      root = Plombir::Scaffold::Site.new("nested/site", dir).create
+      File.read(File.join(root, "content/index.md")).should contain("site")
+      File.read(File.join(root, "plombir.yml")).should contain("title: site")
+
+      absolute = File.join(dir, "elsewhere", "demo")
+      root = Plombir::Scaffold::Site.new(absolute, dir).create
+      root.should eq(absolute)
+      File.read(File.join(root, "plombir.yml")).should contain("title: demo")
+    end
+  end
+
+  it "generates index links that match the router's pretty URLs" do
+    with_tempdir do |dir|
+      root = Plombir::Scaffold::Site.new("my-site", dir).create
+      index = File.read(File.join(root, "content/index.md"))
+
+      index.should contain("/pages/about/")
+      index.should contain("/posts/hello-world/")
     end
   end
 end

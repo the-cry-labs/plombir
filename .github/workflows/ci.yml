@@ -21,6 +21,14 @@ jobs:
         with:
           crystal: ${{ matrix.crystal }}
 
+      - name: Cache shards
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/shards
+          key: ${{ runner.os }}-shards-${{ hashFiles('shard.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-shards-
+
       - name: Install shards
         run: shards install --frozen
 
