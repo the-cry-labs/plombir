@@ -31,7 +31,11 @@ module Plombir
       getter name : String
 
       def initialize(@name : String, parent : String = Dir.current)
-        @root = File.join(parent, @name)
+        @root = if Path[@name].absolute?
+                  File.expand_path(@name)
+                else
+                  File.expand_path(File.join(parent, @name))
+                end
       end
 
       # Creates the site directory tree and writes every template file.
@@ -54,8 +58,8 @@ module Plombir
           raise Error.new("Site name must not be blank.")
         end
 
-        if @name.includes?(File::SEPARATOR)
-          raise Error.new("Site name must be a single directory name, got #{@name.inspect}.")
+        if @name.split(File::SEPARATOR).includes?("..")
+          raise Error.new("Site name must not contain `..`, got #{@name.inspect}.")
         end
       end
 
@@ -68,7 +72,7 @@ module Plombir
       private def write_template(relative : String, template : Symbol) : Nil
         path = File.join(@root, relative)
         Dir.mkdir_p(File.dirname(path))
-        File.write(path, Templates.render(template, @name))
+        File.write(path, Templates.render(template, File.basename(@root)))
       end
     end
   end

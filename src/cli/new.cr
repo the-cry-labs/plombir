@@ -8,9 +8,11 @@ module Plombir
           io << "  plombir new <name>\n"
           io << "\n"
           io << "Create a minimal site that builds with zero configuration.\n"
+          io << "The name may be a plain directory name or a (relative or absolute) path.\n"
           io << "\n"
           io << "Example:\n"
           io << "  plombir new my-site\n"
+          io << "  plombir new /tmp/my-site\n"
         end
       end
 
