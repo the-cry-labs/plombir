@@ -50,5 +50,16 @@ describe Plombir::Content::Collection do
         end
       end
     end
+
+    it "applies permalink patterns to urls and outputs" do
+      with_tempdir do |dir|
+        root = Plombir::Scaffold::Site.new("site", dir).create
+
+        posts = Plombir::Content::Collection.all(root, false, {"posts" => "/blog/:slug/"}).find! { |c| c.name == "posts" }
+
+        posts.documents.first.url.should eq("/blog/hello-world/")
+        posts.documents.first.output_path.should eq("blog/hello-world/index.html")
+      end
+    end
   end
 end

@@ -38,4 +38,17 @@ describe Plombir::CLI::Dev do
       error.to_s.should contain("✖ Invalid frontmatter")
     end
   end
+
+  it "returns project errors for malformed config without serving" do
+    with_tempdir do |dir|
+      root = Plombir::Scaffold::Site.new("site", dir).create
+      File.write(File.join(root, "plombir.yml"), "site: nope\n")
+      error = IO::Memory.new
+
+      code = Plombir::CLI::Dev.call([] of String, root, IO::Memory.new, error)
+
+      code.should eq(1)
+      error.to_s.should contain("Invalid configuration")
+    end
+  end
 end

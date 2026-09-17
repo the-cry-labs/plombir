@@ -92,6 +92,14 @@ module Plombir
       end
     end
 
+    # Loads config, printing unknown-key warnings to *io*.
+    # Raises `Config::Error` on malformed values.
+    def self.load_with_warnings(root : String, io : IO) : Config
+      config = load(root)
+      config.warnings.each { |warning| io.puts "! #{warning}" }
+      config
+    end
+
     # Loads `plombir.yml` from *root*, or defaults when absent.
     def self.load(root : String = Dir.current) : Config
       path = File.join(root, "plombir.yml")

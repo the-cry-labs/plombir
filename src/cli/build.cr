@@ -30,6 +30,7 @@ module Plombir
         end
 
         output = "dist"
+        output_flag = false
         drafts = false
         rest = args.dup
         until rest.empty?
@@ -47,6 +48,7 @@ module Plombir
               return 2
             end
             output = value
+            output_flag = true
           else
             error.puts "✖ Unknown option: #{rest.first}"
             error.puts ""
@@ -55,11 +57,17 @@ module Plombir
           end
         end
 
-        result = Plombir::Build::Pipeline.run(Plombir::Build::Context.new(directory, output, drafts))
+        config = Plombir::Config.load_with_warnings(directory, error)
+        output = config.build.output unless output_flag
+        context = Plombir::Build::Context.new(directory, output, drafts, config.schemas, config.permalink_patterns)
+        result = Plombir::Build::Pipeline.run(context)
         print_summary(result, io)
         0
       rescue ex : Plombir::Build::Error | Plombir::Frontmatter::Error | Plombir::Router::Conflict | Plombir::Renderer::LayoutNotFound
         error.puts ex.message
+        1
+      rescue ex : Plombir::Config::Error
+        error.puts "✖ Invalid configuration\n\n#{ex.message}"
         1
       rescue ex : Exception
         error.puts "✖ Build failed\n\n#{ex.message}"
