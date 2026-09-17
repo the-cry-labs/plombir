@@ -44,7 +44,7 @@ CI runs exactly: `shards install → crystal tool format --check → crystal spe
 3. **Implement thinly:** smallest vertical slice that satisfies acceptance criteria. Prefer simple implementation over abstraction (§39). Keep every intermediate state clean — each step must leave the code cleaner than it was found.
 4. **Verify (every step):** `crystal tool format`, `crystal spec`, `shards build`, plus manual `new → build → preview/check` on a temp site when behavior changed. Paste evidence in PR/summary. **Commit only when all four are green.**
 5. **Commit after every step:** one step = one atomic commit (small diff, green suite, imperative scoped message per §10). Never batch unrelated steps into one commit. Never commit red or unverified code.
-6. **Document:** update phase checkboxes in `roadmap.md` only when gates pass; add ADR for any architectural choice; update `docs/*.md` + error gallery when behavior changes.
+6. **Document:** tick `roadmap.md` acceptance checkboxes in the same change as the verified work — only boxes proven green by specs or manual runs, never on intent; update phase checkboxes only when gates pass; add ADR for any architectural choice; update `docs/*.md` + error gallery when behavior changes.
 7. **Ship via PR:** push the branch and open a pull request per §10. No direct pushes to `main`. Wait for review + green CI before merge.
 8. **Leave clean:** no `TODO`/`FIXME` in user paths, no dead code, no commented-out blocks, no stray fixtures, `git status` minimal.
 
@@ -162,6 +162,7 @@ Rules: exit `0` ok / `1` user-project error / `2` usage error. `--verbose` may a
   ```
 - **Reviewer checklist (all must be yes):**
   - [ ] Maps to exactly one roadmap item; phase order respected?
+  - [ ] Roadmap checkboxes ticked for every verified criterion (none ticked without spec/manual evidence)?
   - [ ] Commits are small, atomic, and each was green (no batched mega-commits)?
   - [ ] `tool format --check` + `spec --error-on-warnings` + `shards build` green with evidence?
   - [ ] Code is clean, optimized, maintainable per §5 (readable cold, no duplication, no dead code, measured perf)?

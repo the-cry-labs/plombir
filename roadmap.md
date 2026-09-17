@@ -33,18 +33,21 @@ Brand reminder (§34): modern, sharp, minimal, premium developer tool. Subtle pl
 
 ---
 
-## 1. Current state — v0.1.0 scaffold
+## 1. Current state — Phase 1 in progress (`build` works end-to-end)
 
-```
-shard.yml          # name/version/authors/crystal/license only
-src/plombir.cr     # module Plombir + VERSION only
-spec/              # placeholder version spec only
-LICENSE            # MPL-2.0 ✓
-README.md          # default shard placeholder ✗ (must be rewritten in Phase 0)
-```
+Phase 0 is done and tagged (`v0.1.0-foundation`). Phase 1 items 1–7 are
+implemented: `plombir new → plombir build → dist/` works on a zero-config
+site (content discovery, frontmatter with defaults, Markdown subset, routing,
+`{{ content }}` layouts per ADR-003, pipeline, `build` CLI). Remaining for
+the exit gate: item 8 fixtures (`minimal-site`, `empty-frontmatter`) and tag
+`v0.2.0-mvp-slice`.
 
-What exists: Crystal toolchain resolves (`crystal 1.21.0`, `shards 0.20.0`), license present.
-What is missing: CLI entrypoint, `shard.yml` binary target, `new/dev/build`, Markdown, frontmatter, routing, layouts, tests, docs, CI.
+What exists: CLI (`new`, `build`, `--version`, `--help`), Markdown subset
+(ADR-001), frontmatter with defaults (ADR-002), pretty-URL router, engine v0
++ page composer (ADR-003), build pipeline, 72 green specs, CI (format + spec
++ release build).
+What is missing: fixture dirs + golden tests, `dev/preview/clean/doctor`,
+collections, templates v1, assets/SEO/feeds, docs site, benchmarks.
 
 ---
 
@@ -110,11 +113,11 @@ Out of scope: Markdown rendering, layouts, `build/dev`, watcher, templates, asse
 
 ### 3.3 Acceptance criteria
 
-- [ ] `shards build` produces `bin/plombir`; `./bin/plombir --version` prints `plombir 0.1.0`.
-- [ ] `./bin/plombir --help` lists `new/dev/build/preview/check/clean/doctor` with one-line descriptions (unimplemented ones marked `coming soon` but exit 0 on help).
-- [ ] `plombir new my-site && ls my-site` matches structure above; no extra boilerplate.
-- [ ] `crystal spec` green; `crystal tool format --check` green; CI green.
-- [ ] README answers in <60s: what / why / quickstart / license.
+- [x] `shards build` produces `bin/plombir`; `./bin/plombir --version` prints `plombir 0.1.0`.
+- [x] `./bin/plombir --help` lists `new/dev/build/preview/check/clean/doctor` with one-line descriptions (unimplemented ones marked `coming soon` but exit 0 on help).
+- [x] `plombir new my-site && ls my-site` matches structure above; no extra boilerplate.
+- [x] `crystal spec` green; `crystal tool format --check` green; CI green.
+- [x] README answers in <60s: what / why / quickstart / license.
 
 ### 3.4 Exit gate
 
@@ -145,7 +148,7 @@ Out of scope: dev server, watcher, collections querying, schemas, components, as
 
 1. **Content discovery** (`src/content/loader.cr`): walk `content/**/*.md`, ignore `_`-prefixed drafts unless `--drafts`. Record mtime, relative path.
 2. **Frontmatter** (`src/frontmatter/parser.cr`): split `---` block; YAML parse via stdlib; on error emit §5-style diagnostic (file, line 5, bad value, expected, example). Missing frontmatter = OK.
-3. **Markdown** (`src/markdown/renderer.cr`): pick implementation — stdlib has none, so either (a) minimal built-in renderer for MVP headings/paragraphs/lists/code/links/images, or (b) one mature shard. Decision must pass §28 checklist; document in `docs/adr/001-markdown.md`.
+3. **Markdown** (`src/markdown/renderer.cr`): pick implementation — stdlib has none, so either (a) minimal built-in renderer for MVP headings/paragraphs/lists/code/links/images, or (b) one mature shard. Decision must pass §28 checklist; document in `docs/adr/001-markdown-renderer.md`.
 4. **Routing** (`src/router/*.cr`): `content/index.md → /index.html`, `about.md → /about/index.html`, `posts/hello.md → /posts/hello/index.html`; `permalink:` override; slugify; detect duplicate routes as errors; drafts excluded.
 5. **Layouts + render** (`src/template/engine_v0.cr`, `src/renderer/page.cr`): load `layouts/*.html`; inject `title, content, page.*, site.*`; missing layout → list available layouts.
 6. **Build pipeline** (`src/build/pipeline.cr`): stages Discovery → Parse → Validate → Route → Render → Copy `public/` → Write `dist/` → Summary. Keep stages as separate classes/modules with a `Build::Context` struct (§21 modularity, no tight coupling).
@@ -154,11 +157,11 @@ Out of scope: dev server, watcher, collections querying, schemas, components, as
 
 ### 4.3 Acceptance criteria
 
-- [ ] Fresh `plombir new demo && cd demo && ../bin/plombir build` emits `dist/index.html`, `dist/about/index.html`, `dist/posts/hello-world/index.html` with `<h1>` from Markdown and layout chrome.
-- [ ] No `plombir.yml` present → build still succeeds with defaults.
-- [ ] Bad frontmatter (`date: yesterday`) fails with file:line, expected format, example — not a stack trace.
-- [ ] Unknown `layout: article` fails listing available layouts.
-- [ ] `dist/` contains no JS, no framework markup; HTML pretty-printed, valid.
+- [x] Fresh `plombir new demo && cd demo && ../bin/plombir build` emits `dist/index.html`, `dist/pages/about/index.html`, `dist/posts/hello-world/index.html` with `<h1>` from Markdown and layout chrome.
+- [x] No `plombir.yml` present → build still succeeds with defaults.
+- [x] Bad frontmatter (`date: yesterday`) fails with file:line, expected format, example — not a stack trace.
+- [x] Unknown `layout: article` fails listing available layouts.
+- [x] `dist/` contains no JS, no framework markup; HTML pretty-printed, valid.
 - [ ] Build of ~200-page fixture completes <1s on CI runner (record time; perf budget starts here).
 
 ### 4.4 Tests

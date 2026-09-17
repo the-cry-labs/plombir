@@ -12,7 +12,7 @@ module Plombir
           io << "Commands:\n"
           io << "  new <name>   Create a new site\n"
           io << "  dev          Start the development server (coming soon)\n"
-          io << "  build        Build the site into dist/ (coming soon)\n"
+          io << "  build        Build the site into dist/\n"
           io << "  preview      Serve the built site locally (coming soon)\n"
           io << "  check        Validate content, routes, links and assets (coming soon)\n"
           io << "  clean        Remove generated output (coming soon)\n"
