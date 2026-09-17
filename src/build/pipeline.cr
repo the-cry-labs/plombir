@@ -76,9 +76,11 @@ module Plombir
         Result.new(routes.size, (Time.instant - started).total_milliseconds.to_i64, context.output)
       end
 
-      # Finds every page and parses its frontmatter, dropping drafts
-      # (`draft: true` or `_`-prefixed paths) unless asked to keep them.
-      private def self.discover(context : Context) : Array(Entry)
+      # The stages below are internal (`Incremental` reuses them per
+      # affected subgraph) but not private: `dev` renders single pages
+      # through `discover` + `resolve` + `render_one` without rerunning
+      # the full pipeline.
+      def self.discover(context : Context) : Array(Entry)
         Content.discover(context.root, drafts: true).compact_map do |page|
           document = Frontmatter.parse(File.read(page.source_path), page.relative_path)
           next nil if (page.draft || document.draft?) && !context.drafts
@@ -88,7 +90,7 @@ module Plombir
 
       # Maps every entry to its pretty URL, raising `Router::Conflict`
       # when two pages claim the same URL.
-      private def self.resolve(entries : Array(Entry)) : Hash(String, Router::Route)
+      def self.resolve(entries : Array(Entry)) : Hash(String, Router::Route)
         Router.routes(entries.map do |entry|
           {entry.page.relative_path, entry.document.string?("permalink")}
         end)
@@ -111,7 +113,7 @@ module Plombir
       end
 
       # Renders one page: Markdown body plus layout with page fields.
-      private def self.render_one(entry : Entry, route : Router::Route, context : Context) : String
+      def self.render_one(entry : Entry, route : Router::Route, context : Context) : String
         body = Markdown.render(entry.document.body)
         vars = Renderer::Page::Context.new
         slug = Router.slugify(File.basename(entry.page.relative_path, ".md"))
@@ -129,7 +131,7 @@ module Plombir
 
       # Copies `public/` as-is; it holds unprocessed files that win by
       # simply existing (the asset pipeline in Phase 5 adds hashing).
-      private def self.copy_public(context : Context) : Nil
+      def self.copy_public(context : Context) : Nil
         public = context.public_dir
         return unless Dir.exists?(public)
         Dir.each_child(public) do |name|
@@ -139,7 +141,7 @@ module Plombir
 
       # Refuses outputs that would delete the site itself: the root, or
       # anything containing the sources (including `/` or `--output .`).
-      private def self.guard_output!(context : Context) : Nil
+      def self.guard_output!(context : Context) : Nil
         expanded = File.expand_path(context.output_dir)
         watched = {
           "site root" => context.root,
@@ -159,7 +161,7 @@ module Plombir
       end
 
       # One discovered page plus its parsed frontmatter.
-      private struct Entry
+      struct Entry
         getter page : Content::Page
         getter document : Frontmatter::Document
 

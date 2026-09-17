@@ -2,9 +2,8 @@ module Plombir
   module CLI
     # Implements `plombir dev [--port 3000] [--host 127.0.0.1]`.
     #
-    # Builds the site into `dist/` once, then serves it. The watcher
-    # (roadmap Phase 2, item 2) turns the single build into a rebuild
-    # loop; until then `dev` is build + serve.
+    # Full initial build (plus dependency graph and cache), then serve
+    # `dist/` while a watcher rebuilds only affected pages per batch.
     module Dev
       DEFAULT_PORT = 3000
 
@@ -13,7 +12,8 @@ module Plombir
           io << "Usage:\n"
           io << "  plombir dev [--port <n>] [--host <addr>]\n"
           io << "\n"
-          io << "Build the site in the current directory and serve dist/.\n"
+          io << "Build the site in the current directory, serve dist/,\n"
+          io << "and rebuild affected pages when files change.\n"
           io << "\n"
           io << "Options:\n"
           io << "  --port <n>    Port to listen on (default: 3000)\n"
@@ -40,17 +40,62 @@ module Plombir
         options = Serve.parse(args, DEFAULT_PORT, error, text)
         return 2 if options.nil?
 
-        code = Build.call([] of String, directory, io, error)
-        return code unless code == 0
+        context = Plombir::Build::Context.new(directory, "dist", false)
+        rebuilder = Plombir::Build::Incremental::Rebuilder.new(context)
+        result = rebuilder.full
+        Build.print_summary(result, io)
 
-        root = File.join(directory, "dist")
-        Serve.run(Plombir::Server::Config.new(root, options.host, options.port), "dist/", io, error)
+        config = Plombir::Server::Config.new(File.join(directory, "dist"), options.host, options.port)
+        server = Plombir::Server::StaticServer.new(config)
+        begin
+          server.listen
+        rescue ex : Plombir::Server::PortInUse
+          error.puts "✖ #{ex.message}"
+          return 1
+        end
+
+        io.puts ""
+        io.puts "Serving dist/ at #{config.url} (rebuilding on change)"
+        io.puts "Press Ctrl+C to stop"
+        watcher = Plombir::Watcher::Watcher.new(directory)
+        Signal::INT.trap do
+          watcher.stop
+          server.close
+        end
+        Signal::TERM.trap do
+          watcher.stop
+          server.close
+        end
+        spawn { server.start }
+        watcher.watch do |batch|
+          rebuild_batch(rebuilder, batch, io, error)
+        end
+        0
       rescue ex : Plombir::Build::Error | Plombir::Frontmatter::Error | Plombir::Router::Conflict | Plombir::Renderer::LayoutNotFound
         error.puts ex.message
         1
       rescue ex : Exception
         error.puts "✖ Dev server failed\n\n#{ex.message}"
         1
+      end
+
+      # One watch batch: rebuild, log the tier taken, and keep serving
+      # last-good output on content errors (polished terminal UX
+      # arrives with roadmap item 5).
+      private def self.rebuild_batch(
+        rebuilder : Plombir::Build::Incremental::Rebuilder,
+        batch : Array(Plombir::Watcher::Event),
+        io : IO,
+        error : IO,
+      ) : Nil
+        report = rebuilder.rebuild(batch)
+        return if report.pages == 0
+        tier = report.tier.to_s.downcase
+        io.puts "↻ Rebuilt #{report.pages} page(s) (#{tier}) in #{report.elapsed_ms}ms — #{report.reason}"
+      rescue ex : Plombir::Build::Error | Plombir::Frontmatter::Error | Plombir::Router::Conflict | Plombir::Renderer::LayoutNotFound
+        error.puts ex.message
+      rescue ex : Exception
+        error.puts "✖ Rebuild failed\n\n#{ex.message}"
       end
 
       def self.run(args : Array(String)) : Nil

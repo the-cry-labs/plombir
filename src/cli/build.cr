@@ -70,7 +70,9 @@ module Plombir
         exit call(args)
       end
 
-      private def self.print_summary(result : Plombir::Build::Result, io : IO) : Nil
+      # Internal: shared with `Dev`, which builds through `Rebuilder`
+      # but prints the same summary.
+      def self.print_summary(result : Plombir::Build::Result, io : IO) : Nil
         documents = result.pages == 1 ? "document" : "documents"
         pages = result.pages == 1 ? "page" : "pages"
         io.puts "✓ Loaded #{result.pages} #{documents}"
