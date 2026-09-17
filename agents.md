@@ -17,7 +17,7 @@
 - **What:** Plombir — modern, extremely fast static site generator in Crystal. Jekyll simplicity + Astro content-model/DX, own coherent design. Single native binary, no Node.js.
 - **License:** MPL-2.0 (`LICENSE`, `shard.yml: license: MPL-2.0`). Never add GPL/AGPL/SSPL/Commons-Clause deps. Check compatibility first (§12).
 - **Toolchain:** Crystal `>= 1.21.0` (verified `1.21.0`), Shards `0.20.0`. Stdlib-first: `YAML/JSON/XML/HTTP/OptionParser/File/Digest`.
-- **Current state:** `v0.1.0` scaffold only (`src/plombir.cr` = VERSION, placeholder spec). Phase 0 (repo foundation) is the active phase — see `roadmap.md §3`.
+- **Current state:** `roadmap.md §1` is the single source of truth — read it, never duplicate it here (duplicates rot).
 - **Key docs:** `roadmap.md` (plan) · `README.md` (user entry) · `docs/adr/` (decisions) · `docs/benchmarks.md` (perf claims, from Phase 2).
 
 ## 2. Golden commands (run from repo root)
@@ -39,7 +39,7 @@ CI runs exactly: `shards install → crystal tool format --check → crystal spe
 
 ## 3. Agent operating loop (mandatory)
 
-1. **Orient:** read `roadmap.md` active phase + this file + relevant `src/` + `spec/fixtures/`. Never assume — inspect with `read_files` first.
+1. **Orient (fresh session first):** `git status` (clean, or know why not) → `git log --oneline -5` (where did we stop?) → read `roadmap.md §1` (active phase + next item) → this file → relevant `src/` + `spec/fixtures/`. Run `crystal tool format --check` + `crystal spec` baseline before touching code. Never assume — inspect files first.
 2. **Plan:** state goal → scope → files to touch → tests to add → docs to update. One roadmap work-item per change. No drive-by refactors. Break the work-item into small ordered steps; one step = one commit.
 3. **Implement thinly:** smallest vertical slice that satisfies acceptance criteria. Prefer simple implementation over abstraction (§39). Keep every intermediate state clean — each step must leave the code cleaner than it was found.
 4. **Verify (every step):** `crystal tool format`, `crystal spec`, `shards build`, plus manual `new → build → preview/check` on a temp site when behavior changed. Paste evidence in PR/summary. **Commit only when all four are green.**
