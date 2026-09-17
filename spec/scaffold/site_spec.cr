@@ -12,8 +12,8 @@ describe Plombir::Scaffold::Site do
         layouts/default.html
         layouts/post.html
         components/.gitkeep
-        assets/style.css
         assets/images/.gitkeep
+        public/assets/style.css
         public/.gitkeep
         plombir.yml
         .gitignore
