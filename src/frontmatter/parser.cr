@@ -142,6 +142,11 @@ module Plombir
       end
 
       # 1-based file line of the `key:` entry, or 1 when unknown.
+      # Public for violation reporting (`Schema` points at the key).
+      def line_of(key : String) : Int32
+        key_line(key)
+      end
+
       private def key_line(key : String) : Int32
         @block_lines.each_with_index do |line, index|
           return index + 2 if line =~ /^\s*#{Regex.escape(key)}\s*:/
