@@ -31,15 +31,29 @@ module Plombir
       end
 
       # Outcome of one `Rebuilder#rebuild`: the tier taken, how many
-      # pages were rewritten, wall-clock time, and a human-readable
-      # reason naming the path (e.g. `"layout post changed"`).
+      # pages were rewritten, wall-clock time, a human-readable reason
+      # naming the path, and the per-file breakdown the dev loop
+      # prints (`files` is empty for full rebuilds, which print a
+      # summary line instead).
       struct RebuildReport
         getter tier : Tier
         getter pages : Int32
         getter elapsed_ms : Int64
         getter reason : String
+        getter files : Array(RebuiltFile)
 
-        def initialize(@tier : Tier, @pages : Int32, @elapsed_ms : Int64, @reason : String)
+        def initialize(@tier : Tier, @pages : Int32, @elapsed_ms : Int64, @reason : String, @files : Array(RebuiltFile) = [] of RebuiltFile)
+        end
+      end
+
+      # One rewritten page: content-relative source (`posts/a.md`),
+      # public URL, and its own render time.
+      struct RebuiltFile
+        getter source : String
+        getter url : String
+        getter elapsed_ms : Int64
+
+        def initialize(@source : String, @url : String, @elapsed_ms : Int64)
         end
       end
 
@@ -170,11 +184,11 @@ module Plombir
             return RebuildReport.new(Tier::Page, 0, elapsed(started), "nothing changed")
           end
 
-          render_targets(targets, graph)
+          files = render_targets(targets, graph)
           @graph.not_nil!.save(cache_path)
           tier = layout_targets.paths.empty? ? Tier::Page : Tier::Layout
           reason = tier == Tier::Page ? "content changed" : "layout #{layout_targets.names.join(", ")} changed"
-          RebuildReport.new(tier, targets.size, elapsed(started), reason)
+          RebuildReport.new(tier, targets.size, elapsed(started), reason, files)
         end
 
         private struct Targets
@@ -244,11 +258,13 @@ module Plombir
         end
 
         # Re-discovers and re-renders exactly *targets*, refreshing
-        # their graph records (hash, layout, layout index).
-        private def render_targets(targets : Array(String), graph : DependencyGraph) : Nil
+        # their graph records (hash, layout, layout index). Returns the
+        # per-file breakdown sorted by source for stable log output.
+        private def render_targets(targets : Array(String), graph : DependencyGraph) : Array(RebuiltFile)
           entries = Pipeline.discover(@context)
           routes = Pipeline.resolve(entries)
-          targets.each do |relative|
+          files = targets.map do |relative|
+            started = Time.instant
             entry = entries.find! { |e| e.page.relative_path == relative }
             route = routes[relative]
             destination = File.join(@context.output_dir, route.output_path)
@@ -265,7 +281,10 @@ module Plombir
               (graph.layouts[record.layout] ||= [] of String) << relative
               graph.layouts[record.layout].sort!
             end
+
+            RebuiltFile.new(source: relative, url: route.url, elapsed_ms: elapsed(started))
           end
+          files.sort_by(&.source)
         end
 
         private def full_as(tier : Tier, reason : String, started : Time::Instant) : RebuildReport
