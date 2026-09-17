@@ -37,14 +37,23 @@ module Plombir
     # `/` and directory paths resolve to `index.html` inside them,
     # anything else must name an existing file, otherwise the
     # `404.html` page (or a plain fallback) is served with status 404.
+    #
+    # With a `LiveReload::Reloader`, `dev` additionally serves the SSE
+    # event stream and injects the reload snippet into `.html` pages.
+    # Without one (preview), files go out byte-identical to disk.
     class Handler
       include HTTP::Handler
 
-      def initialize(root : String)
+      def initialize(root : String, @reloader : LiveReload::Reloader? = nil)
         @root = File.expand_path(root)
       end
 
       def call(context : HTTP::Server::Context) : Nil
+        if @reloader && context.request.path == LiveReload::EVENTS_PATH
+          serve_events(context, @reloader.not_nil!)
+          return
+        end
+
         file = resolve(context.request.path)
         if file
           serve_file(context, file)
@@ -69,6 +78,14 @@ module Plombir
       end
 
       private def serve_file(context : HTTP::Server::Context, file : String) : Nil
+        if @reloader && File.extname(file) == ".html"
+          body = LiveReload.inject(File.read(file))
+          context.response.content_type = "text/html"
+          context.response.content_length = body.bytesize
+          context.response.print(body) unless context.request.method == "HEAD"
+          return
+        end
+
         context.response.content_type = MIME.from_extension(File.extname(file))
         context.response.content_length = File.size(file)
         return if context.request.method == "HEAD"
@@ -88,6 +105,33 @@ module Plombir
           context.response.print("Not found") unless context.request.method == "HEAD"
         end
       end
+
+      # Holds one SSE stream open, forwarding reload pings until the
+      # tab disconnects (surfacing as a write error) or the server
+      # closes. Heartbeats reap tabs that vanished silently.
+      private def serve_events(context : HTTP::Server::Context, reloader : LiveReload::Reloader) : Nil
+        context.response.content_type = "text/event-stream"
+        context.response.headers["Cache-Control"] = "no-cache"
+        context.response.print(": connected\n\n")
+        context.response.flush
+
+        channel = reloader.subscribe
+        begin
+          loop do
+            select
+            when channel.receive
+              context.response.print("data: reload\n\n")
+            when timeout(LiveReload::HEARTBEAT)
+              context.response.print(": ping\n\n")
+            end
+            context.response.flush
+          end
+        rescue IO::Error
+          # Tab went away; fall through to unsubscribe.
+        ensure
+          reloader.unsubscribe(channel)
+        end
+      end
     end
 
     # Lifecycle wrapper around `HTTP::Server`: `listen` binds the
@@ -95,8 +139,8 @@ module Plombir
     # stops gracefully — the CLI calls it from `SIGINT`/`SIGTERM`
     # traps so `Ctrl+C` exits crash-free.
     class StaticServer
-      def initialize(@config : Config)
-        @server = HTTP::Server.new([Handler.new(@config.root)] of HTTP::Handler)
+      def initialize(@config : Config, reloader : LiveReload::Reloader? = nil)
+        @server = HTTP::Server.new([Handler.new(@config.root, reloader)] of HTTP::Handler)
       end
 
       def listen : Nil

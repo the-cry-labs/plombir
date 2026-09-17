@@ -9,9 +9,9 @@ def spec_free_port : Int32
   port
 end
 
-def with_static_server(root : String, & : Int32 ->) : Nil
+def with_static_server(root : String, reloader : Plombir::LiveReload::Reloader? = nil, & : Int32 ->) : Nil
   port = spec_free_port
-  server = Plombir::Server::StaticServer.new(Plombir::Server::Config.new(root, "127.0.0.1", port))
+  server = Plombir::Server::StaticServer.new(Plombir::Server::Config.new(root, "127.0.0.1", port), reloader)
   server.listen
   spawn { server.start }
   begin
