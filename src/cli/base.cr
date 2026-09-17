@@ -17,7 +17,9 @@ module Plombir
         Version.print
       when "new"
         New.run(positional[1..])
-      when "dev", "build", "preview", "check", "clean", "doctor"
+      when "build"
+        Build.run(positional[1..])
+      when "dev", "preview", "check", "clean", "doctor"
         coming_soon(command)
       else
         STDERR.puts "✖ Unknown command: #{command}"
