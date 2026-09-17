@@ -6,3 +6,12 @@
 # - src/scaffold/site.cr (FILES)
 # - spec/scaffold/site_spec.cr
 # - roadmap.md §3 (`new` v0 structure)
+#
+# Golden fixtures (`minimal-site/`, `empty-frontmatter/`, …): each has
+# `content/`, `layouts/`, optional `public/`, a README saying what it
+# proves, and `expected/` with byte-exact `dist/` output asserted by
+# `spec/build/golden_spec.cr`. Fixture pages use explicit `date:` (or
+# layouts without `{{ date }}`) so goldens stay deterministic.
+# Regenerate only from reviewed output:
+#   REGENERATE_GOLDEN=1 crystal spec spec/build/golden_spec.cr
+#   git diff spec/fixtures/*/expected/
