@@ -70,6 +70,21 @@ module Plombir
       slug.empty? ? "page" : slug
     end
 
+    # Expands a collection permalink pattern (`/blog/:year/:slug/`)
+    # with the page's slug, title, and date. Tokens: `:year` (YYYY),
+    # `:month`/`day` (zero-padded), `:slug`, `:title` (slugified, so
+    # the URL stays safe). Unknown tokens are a config error, caught
+    # at load time — here they pass through untouched.
+    def self.expand(pattern : String, slug : String, title : String, date : Time) : String
+      expanded = pattern
+        .gsub(":year", date.to_s("%Y"))
+        .gsub(":month", date.to_s("%m"))
+        .gsub(":day", date.to_s("%d"))
+        .gsub(":slug", slug)
+        .gsub(":title", slugify(title))
+      normalize(expanded)
+    end
+
     private def self.conventional_url(relative : String) : String
       parts = relative.sub(/\.md$/, "").split(File::SEPARATOR)
       parts = parts.map { |part| slugify(part) }
