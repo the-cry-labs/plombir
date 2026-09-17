@@ -2,14 +2,14 @@ require "../spec_helper"
 require "http/client"
 require "socket"
 
-private def spec_free_port : Int32
+def spec_free_port : Int32
   server = TCPServer.new("127.0.0.1", 0)
   port = server.local_address.as(Socket::IPAddress).port
   server.close
   port
 end
 
-private def with_static_server(root : String, & : Int32 ->) : Nil
+def with_static_server(root : String, & : Int32 ->) : Nil
   port = spec_free_port
   server = Plombir::Server::StaticServer.new(Plombir::Server::Config.new(root, "127.0.0.1", port))
   server.listen
@@ -21,7 +21,7 @@ private def with_static_server(root : String, & : Int32 ->) : Nil
   end
 end
 
-private def write_server_root(dir : String, with_404 : Bool = true) : String
+def write_server_root(dir : String, with_404 : Bool = true) : String
   root = File.join(dir, "dist")
   Dir.mkdir_p(File.join(root, "posts"))
   File.write(File.join(root, "index.html"), "<h1>Home</h1>\n")
