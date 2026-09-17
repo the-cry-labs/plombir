@@ -16,7 +16,7 @@ module Plombir
           io << "  preview      Serve the built site locally\n"
           io << "  check        Validate content, routes, links and assets (coming soon)\n"
           io << "  clean        Remove generated output\n"
-          io << "  doctor       Diagnose the environment and project (coming soon)\n"
+          io << "  doctor       Diagnose the environment and project\n"
           io << "  version      Print the version\n"
           io << "  help         Print this help\n"
           io << "\n"
