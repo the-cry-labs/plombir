@@ -200,11 +200,11 @@ Out of scope: HMR for CSS/JS, islands hydration, advanced asset bundling.
 
 ### 5.3 Acceptance criteria
 
-- [ ] `plombir dev` cold-start <500ms on minimal site; single-file edit visible after browser refresh <100ms rebuild (log proves incremental path, not full).
-- [ ] Layout edit rebuilds only consumers (assert via rebuild log + mtimes).
-- [ ] Crash-free `Ctrl+C`; port conflict prints `Port 3000 in use. Try --port 3001`.
-- [ ] `preview` serves `dist/` byte-identical to `build` (no reload script injected).
-- [ ] `check`-adjacent `doctor` catches: missing `content/`, unknown layout, duplicate route.
+- [x] `plombir dev` cold-start <500ms on minimal site (measured 8ms); single-file edit rebuilds in <100ms with the log proving the incremental path (`rebuilt posts/hello.md → /posts/hello/ in 0ms`, no `(full)` marker). See `docs/benchmarks.md`.
+- [x] Layout edit rebuilds only consumers (assert via rebuild log + mtimes: `spec/build/incremental_spec.cr`, plus live siblings-untouched check).
+- [x] Crash-free `Ctrl+C`; port conflict prints `Port 3000 in use. Try --port 3001` (exact string asserted in `spec/server/server_spec.cr`, SIGINT verified live).
+- [x] `preview` serves `dist/` byte-identical to `build` (no reload script injected: `diff -r` clean live, no-snippet spec pins the `nil`-reloader path).
+- [x] `check`-adjacent `doctor` catches: missing `content/`, unknown layout, duplicate route (`spec/doctor/doctor_spec.cr` pass/fail fixtures).
 
 ### 5.4 Exit gate
 
