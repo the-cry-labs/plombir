@@ -78,8 +78,9 @@ module Plombir
         raise Error.new(@file, key_line("date"), date_message)
       end
 
-      # Returns tags as a list: `tags: plombir` and the list form both
-      # work; a missing key means no tags.
+      # Returns tags as a normalized list: `tags: plombir` and the
+      # list form both work; items are stripped and empties dropped;
+      # a missing key means no tags.
       #
       # ```
       # doc.tags # => ["plombir", "hello"]
@@ -88,11 +89,12 @@ module Plombir
         value = @data["tags"]?
         return [] of String if value.nil? || value.raw.nil?
         if list = value.as_a?
-          return list.map { |entry| entry.as_s? || entry.to_s }
+          return list.map { |entry| (entry.as_s? || entry.to_s).strip }.reject(&.empty?)
         end
         if text = value.as_s?
-          return [] of String if text.strip.empty?
-          return [text.strip]
+          stripped = text.strip
+          return [] of String if stripped.empty?
+          return [stripped]
         end
         raise Error.new(@file, key_line("tags"), tags_message)
       end
@@ -152,34 +154,30 @@ module Plombir
         @block_lines.find { |line| line =~ /^\s*#{Regex.escape(key)}\s*:/ }.try(&.strip) || "#{key}: #{@data[key]}"
       end
 
-      private def date_message : String
+      # Value errors name the field, the received source line, and
+      # what was expected, so `check` and `doctor` can point at the
+      # exact key (roadmap §6.2.2 §13-style contract).
+      private def field_error(key : String, expected : String, example : String) : String
         String.build do |io|
           io << "✖ Invalid frontmatter\n\n"
-          io << @file << ":" << key_line("date") << "\n\n"
-          io << key_source("date") << "\n\n"
-          io << "Expected a date like YYYY-MM-DD or RFC3339.\n\n"
-          io << "Example:\ndate: 2026-09-13\n"
+          io << @file << ":" << key_line(key) << "\n\n"
+          io << "Field: " << key << "\n"
+          io << "Received: " << key_source(key) << "\n"
+          io << "Expected: " << expected << "\n\n"
+          io << "Example:\n" << example << "\n"
         end
+      end
+
+      private def date_message : String
+        field_error("date", "a date like YYYY-MM-DD or RFC3339", "date: 2026-09-13")
       end
 
       private def tags_message : String
-        String.build do |io|
-          io << "✖ Invalid frontmatter\n\n"
-          io << @file << ":" << key_line("tags") << "\n\n"
-          io << key_source("tags") << "\n\n"
-          io << "Expected a single value or a list of values.\n\n"
-          io << "Example:\ntags: plombir\n"
-        end
+        field_error("tags", "a single value or a list of values", "tags: plombir")
       end
 
       private def draft_message : String
-        String.build do |io|
-          io << "✖ Invalid frontmatter\n\n"
-          io << @file << ":" << key_line("draft") << "\n\n"
-          io << key_source("draft") << "\n\n"
-          io << "Expected true or false.\n\n"
-          io << "Example:\ndraft: true\n"
-        end
+        field_error("draft", "true or false", "draft: true")
       end
     end
 

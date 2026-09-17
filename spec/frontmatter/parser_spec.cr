@@ -95,6 +95,20 @@ describe Plombir::Frontmatter do
     Plombir::Frontmatter.parse("---\ntags:\n  - a\n  - b\n---\nBody\n", "c.md").tags.should eq(["a", "b"])
   end
 
+  it "labels field, received, and expected on value errors" do
+    ex = expect_raises(Plombir::Frontmatter::Error) do
+      Plombir::Frontmatter.parse("---\ndate: yesterday\n---\nBody\n", "hello.md").date
+    end
+
+    ex.message.to_s.should contain("Field: date")
+    ex.message.to_s.should contain("Received: date: yesterday")
+    ex.message.to_s.should contain("Expected: a date like YYYY-MM-DD or RFC3339")
+  end
+
+  it "parses RFC3339 offsets" do
+    Plombir::Frontmatter.parse("---\ndate: 2026-09-13T12:00:00+02:00\n---\nBody\n", "a.md").date.should eq(Time.utc(2026, 9, 13, 10, 0, 0))
+  end
+
   it "rejects mapping tags with file and line" do
     ex = expect_raises(Plombir::Frontmatter::Error) do
       Plombir::Frontmatter.parse("---\ntags:\n  key: value\n---\nBody\n", "tags.md").tags
@@ -102,6 +116,12 @@ describe Plombir::Frontmatter do
 
     ex.message.to_s.should contain("tags.md:2")
     ex.message.to_s.should contain("single value or a list")
+  end
+
+  it "strips tags and drops empties" do
+    Plombir::Frontmatter.parse("---\ntags: \"  spaced  \"\n---\nBody\n", "d.md").tags.should eq(["spaced"])
+    Plombir::Frontmatter.parse("---\ntags:\n  - \" padded \"\n  - \"\"\n  - ok\n---\nBody\n", "e.md").tags.should eq(["padded", "ok"])
+    Plombir::Frontmatter.parse("---\ntags: \"\"\n---\nBody\n", "f.md").tags.should eq([] of String)
   end
 
   it "reads draft flags, defaulting to false" do
