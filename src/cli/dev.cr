@@ -46,7 +46,8 @@ module Plombir
         Build.print_summary(result, io)
 
         config = Plombir::Server::Config.new(File.join(directory, "dist"), options.host, options.port)
-        server = Plombir::Server::StaticServer.new(config)
+        reloader = Plombir::LiveReload::Reloader.new
+        server = Plombir::Server::StaticServer.new(config, reloader)
         begin
           server.listen
         rescue ex : Plombir::Server::PortInUse
@@ -68,7 +69,7 @@ module Plombir
         end
         spawn { server.start }
         watcher.watch do |batch|
-          rebuild_batch(rebuilder, batch, io, error)
+          rebuild_batch(rebuilder, batch, reloader, io, error)
         end
         0
       rescue ex : Plombir::Build::Error | Plombir::Frontmatter::Error | Plombir::Router::Conflict | Plombir::Renderer::LayoutNotFound
@@ -79,12 +80,13 @@ module Plombir
         1
       end
 
-      # One watch batch: rebuild, log the tier taken, and keep serving
-      # last-good output on content errors (polished terminal UX
-      # arrives with roadmap item 5).
+      # One watch batch: rebuild, log the tier taken, ping tabs on
+      # success, and keep serving last-good output on content errors
+      # (polished terminal UX arrives with roadmap item 5).
       private def self.rebuild_batch(
         rebuilder : Plombir::Build::Incremental::Rebuilder,
         batch : Array(Plombir::Watcher::Event),
+        reloader : Plombir::LiveReload::Reloader,
         io : IO,
         error : IO,
       ) : Nil
@@ -92,6 +94,7 @@ module Plombir
         return if report.pages == 0
         tier = report.tier.to_s.downcase
         io.puts "↻ Rebuilt #{report.pages} page(s) (#{tier}) in #{report.elapsed_ms}ms — #{report.reason}"
+        reloader.notify
       rescue ex : Plombir::Build::Error | Plombir::Frontmatter::Error | Plombir::Router::Conflict | Plombir::Renderer::LayoutNotFound
         error.puts ex.message
       rescue ex : Exception
