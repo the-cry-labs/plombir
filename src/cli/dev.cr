@@ -57,6 +57,7 @@ module Plombir
 
         io.puts ""
         io.puts "Serving dist/ at #{config.url} (rebuilding on change)"
+        io.puts "Watching content/ layouts/ public/ assets/ plombir.yml for changes"
         io.puts "Press Ctrl+C to stop"
         watcher = Plombir::Watcher::Watcher.new(directory)
         Signal::INT.trap do
@@ -80,9 +81,11 @@ module Plombir
         1
       end
 
-      # One watch batch: rebuild, log the tier taken, ping tabs on
-      # success, and keep serving last-good output on content errors
-      # (polished terminal UX arrives with roadmap item 5).
+      # One watch batch: rebuild, log what happened, ping tabs on
+      # success, and keep serving last-good output on content errors.
+      # Incremental tiers print one `↻ rebuilt <source> → <url>` line
+      # per page (roadmap §5.2.5); full rebuilds print a summary so a
+      # 200-page site does not spam 200 lines.
       private def self.rebuild_batch(
         rebuilder : Plombir::Build::Incremental::Rebuilder,
         batch : Array(Plombir::Watcher::Event),
@@ -92,8 +95,13 @@ module Plombir
       ) : Nil
         report = rebuilder.rebuild(batch)
         return if report.pages == 0
-        tier = report.tier.to_s.downcase
-        io.puts "↻ Rebuilt #{report.pages} page(s) (#{tier}) in #{report.elapsed_ms}ms — #{report.reason}"
+        if report.tier == Plombir::Build::Incremental::Tier::Full || report.files.empty?
+          io.puts "↻ rebuilt #{report.pages} page(s) (full) in #{report.elapsed_ms}ms — #{report.reason}"
+        else
+          report.files.each do |file|
+            io.puts "↻ rebuilt #{file.source} → #{file.url} in #{file.elapsed_ms}ms"
+          end
+        end
         reloader.notify
       rescue ex : Plombir::Build::Error | Plombir::Frontmatter::Error | Plombir::Router::Conflict | Plombir::Renderer::LayoutNotFound
         error.puts ex.message
