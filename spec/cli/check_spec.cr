@@ -26,7 +26,7 @@ describe Plombir::CLI::Check do
       code.should eq(0)
       io.to_s.should contain("Content")
       io.to_s.should contain("SEO")
-      io.to_s.should contain("All checks passed.")
+      io.to_s.should contain("No problems found.")
     end
   end
 

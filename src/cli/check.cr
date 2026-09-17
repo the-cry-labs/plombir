@@ -85,7 +85,8 @@ module Plombir
         errors = issues.count(&.error?)
         warnings = issues.size - errors
         if issues.empty?
-          io.puts "All checks passed."
+          # Wording matches the roadmap §6.3 acceptance box verbatim.
+          io.puts "No problems found."
         else
           parts = [] of String
           parts << "#{errors} #{errors == 1 ? "error" : "errors"}" if errors > 0
