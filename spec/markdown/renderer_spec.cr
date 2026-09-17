@@ -26,6 +26,10 @@ describe Plombir::Markdown do
     html.should contain("<hr>")
   end
 
+  it "ignores leading blank lines before blocks" do
+    Plombir::Markdown.render("\n# Hello\n\nWorld.\n").should eq("<h1>Hello</h1>\n<p>World.</p>\n")
+  end
+
   it "escapes raw HTML instead of injecting it" do
     html = Plombir::Markdown.render("<script>alert(1)</script>\n")
 

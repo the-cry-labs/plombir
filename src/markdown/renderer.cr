@@ -38,6 +38,11 @@ module Plombir
 
       private def render_block(block : String, io : IO) : Nil
         lines = block.lines.map(&.rstrip)
+        # Bodies often start with a blank line (e.g. after frontmatter);
+        # the split delimiter leaves one behind, so skip it before matching.
+        while lines.size > 1 && lines.first.empty?
+          lines.shift
+        end
         first = lines.first.strip
 
         if heading = parse_heading(first)
