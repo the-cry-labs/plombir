@@ -18,14 +18,22 @@ module Plombir
     end
 
     # Inputs for one build: site *root*, *output* directory (relative
-    # to *root* unless absolute), and whether *drafts* are included
-    # (`plombir build --drafts`).
+    # to *root* unless absolute), whether *drafts* are included
+    # (`plombir build --drafts`), and optional per-collection schema
+    # rules (empty means no validation; the config loader fills these
+    # from `schema:` in `plombir.yml`).
     struct Context
       getter root : String
       getter output : String
       getter drafts : Bool
+      getter schemas : Hash(String, Content::Schema::CollectionRules)
 
-      def initialize(@root : String = Dir.current, @output : String = "dist", @drafts : Bool = false)
+      def initialize(
+        @root : String = Dir.current,
+        @output : String = "dist",
+        @drafts : Bool = false,
+        @schemas : Hash(String, Content::Schema::CollectionRules) = {} of String => Content::Schema::CollectionRules,
+      )
       end
 
       def content_dir : String
@@ -69,11 +77,26 @@ module Plombir
         guard_output!(context)
 
         entries = discover(context)
+        validate_schemas!(context, entries)
         routes = resolve(entries)
         render_all(entries, routes, context)
         copy_public(context)
 
         Result.new(routes.size, (Time.instant - started).total_milliseconds.to_i64, context.output)
+      end
+
+      # Validates frontmatter against the context schemas, printing
+      # every violation together. Empty schemas skip silently, so
+      # `build` behaves exactly as before without configuration.
+      private def self.validate_schemas!(context : Context, entries : Array(Entry)) : Nil
+        return if context.schemas.empty?
+        pairs = entries.map { |entry| {entry.page, entry.document} }
+        violations = Content::Schema.validate(pairs, context.schemas)
+        return if violations.empty?
+
+        problems = violations.size == 1 ? "1 problem" : "#{violations.size} problems"
+        lines = violations.map(&.message).join("\n")
+        raise Error.new("✖ Schema validation failed (#{problems})\n\n#{lines}\n\nFix the frontmatter and rebuild.")
       end
 
       # The stages below are internal (`Incremental` reuses them per

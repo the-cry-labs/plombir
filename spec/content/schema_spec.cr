@@ -70,4 +70,38 @@ describe Plombir::Content::Schema do
 
     Plombir::Content::Schema.validate(pages, {} of String => Plombir::Content::Schema::CollectionRules).should be_empty
   end
+
+  describe "build integration" do
+    it "fails the build printing every violation together" do
+      with_tempdir do |dir|
+        root = Plombir::Scaffold::Site.new("site", dir).create
+        about = File.join(root, "content", "pages", "about.md")
+        File.write(about, File.read(about).sub("layout: default", "layout: default\nrating: high"))
+        schemas = {
+          "posts" => {"rating" => Plombir::Content::Schema::FieldRule.new("number", true)},
+          "pages" => {"rating" => Plombir::Content::Schema::FieldRule.new("number", true)},
+        }
+        context = Plombir::Build::Context.new(root, "dist", false, schemas)
+
+        ex = expect_raises(Plombir::Build::Error) do
+          Plombir::Build::Pipeline.run(context)
+        end
+
+        ex.message.to_s.should contain("Schema validation failed (2 problems)")
+        ex.message.to_s.should contain("posts/hello-world.md")
+        ex.message.to_s.should contain("pages/about.md")
+        ex.message.to_s.should contain("Fix the frontmatter and rebuild.")
+      end
+    end
+
+    it "builds cleanly when schemas pass" do
+      with_tempdir do |dir|
+        root = Plombir::Scaffold::Site.new("site", dir).create
+        schemas = {"posts" => {"layout" => Plombir::Content::Schema::FieldRule.new("string", true)}}
+        context = Plombir::Build::Context.new(root, "dist", false, schemas)
+
+        Plombir::Build::Pipeline.run(context).pages.should eq(3)
+      end
+    end
+  end
 end
