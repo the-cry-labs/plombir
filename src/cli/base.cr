@@ -23,7 +23,9 @@ module Plombir
         Dev.run(positional[1..])
       when "preview"
         Preview.run(positional[1..])
-      when "check", "clean", "doctor"
+      when "clean"
+        Clean.run(positional[1..])
+      when "check", "doctor"
         coming_soon(command)
       else
         STDERR.puts "✖ Unknown command: #{command}"
