@@ -28,6 +28,12 @@ describe Plombir::Content::Document do
       excerpt.split(" ").size.should be > 10
     end
 
+    it "skips leading headings and blanks in fallbacks" do
+      frontmatter = doc_parse("---\ntitle: T\n---\n\n# Heading\n\n\nReal start\n")
+
+      Plombir::Content::Document.excerpt(frontmatter).should eq("Real start")
+    end
+
     it "keeps short bodies whole" do
       frontmatter = doc_parse("---\ntitle: T\n---\n\nShort body\n")
 
