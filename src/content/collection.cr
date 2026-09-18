@@ -15,9 +15,9 @@ module Plombir
 
       # Discovers, parses, and groups every page under `content/`.
       # Drafts (`draft: true` or `_`-prefixed) are skipped unless
-      # *drafts* is true. Duplicate routes raise `Router::Conflict`,
-      # like the build.
-      def self.all(root : String, drafts : Bool = false) : Array(Collection)
+      # *drafts* is true. Collection permalink *patterns* expand like
+      # the build; duplicate routes raise `Router::Conflict`.
+      def self.all(root : String, drafts : Bool = false, patterns : Hash(String, String) = {} of String => String) : Array(Collection)
         grouped = Hash(String, Array({Page, Frontmatter::Document})).new do |hash, key|
           hash[key] = [] of {Page, Frontmatter::Document}
         end
@@ -28,7 +28,8 @@ module Plombir
         end
 
         pairs = grouped.values.flatten.map do |(page, document)|
-          {page.relative_path, document.string?("permalink")}
+          permalink = Config::Permalinks.effective(page.relative_path, document, page.mtime, patterns)
+          {page.relative_path, permalink}
         end
         routes = Router.routes(pairs)
 

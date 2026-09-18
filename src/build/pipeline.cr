@@ -19,20 +19,23 @@ module Plombir
 
     # Inputs for one build: site *root*, *output* directory (relative
     # to *root* unless absolute), whether *drafts* are included
-    # (`plombir build --drafts`), and optional per-collection schema
-    # rules (empty means no validation; the config loader fills these
-    # from `schema:` in `plombir.yml`).
+    # (`plombir build --drafts`), optional per-collection schema rules
+    # (empty means no validation), and optional collection permalink
+    # patterns (empty means conventional URLs). The config loader fills
+    # all three from `plombir.yml`.
     struct Context
       getter root : String
       getter output : String
       getter drafts : Bool
       getter schemas : Hash(String, Content::Schema::CollectionRules)
+      getter patterns : Hash(String, String)
 
       def initialize(
         @root : String = Dir.current,
         @output : String = "dist",
         @drafts : Bool = false,
         @schemas : Hash(String, Content::Schema::CollectionRules) = {} of String => Content::Schema::CollectionRules,
+        @patterns : Hash(String, String) = {} of String => String,
       )
       end
 
@@ -78,7 +81,7 @@ module Plombir
 
         entries = discover(context)
         validate_schemas!(context, entries)
-        routes = resolve(entries)
+        routes = resolve(entries, context.patterns)
         render_all(entries, routes, context)
         copy_public(context)
 
@@ -112,10 +115,13 @@ module Plombir
       end
 
       # Maps every entry to its pretty URL, raising `Router::Conflict`
-      # when two pages claim the same URL.
-      def self.resolve(entries : Array(Entry)) : Hash(String, Router::Route)
+      # when two pages claim the same URL. Explicit frontmatter wins;
+      # otherwise the collection *patterns* expand (conventional URLs
+      # when absent).
+      def self.resolve(entries : Array(Entry), patterns : Hash(String, String) = {} of String => String) : Hash(String, Router::Route)
         Router.routes(entries.map do |entry|
-          {entry.page.relative_path, entry.document.string?("permalink")}
+          permalink = Config::Permalinks.effective(entry.page.relative_path, entry.document, entry.page.mtime, patterns)
+          {entry.page.relative_path, permalink}
         end)
       end
 

@@ -70,4 +70,78 @@ describe Plombir::CLI::Build do
       error.to_s.should_not contain("Backtrace")
     end
   end
+
+  describe "plombir.yml" do
+    it "honors configured output, schemas, and permalink patterns" do
+      with_tempdir do |dir|
+        root = Plombir::Scaffold::Site.new("site", dir).create
+        File.write(File.join(root, "plombir.yml"), <<-YAML
+          build:
+            output: out
+          collections:
+            posts:
+              permalink: /blog/:slug/
+              schema:
+                layout: {type: string, required: true}
+          YAML
+        )
+
+        code = Plombir::CLI::Build.call([] of String, root, IO::Memory.new, IO::Memory.new)
+
+        code.should eq(0)
+        File.exists?(File.join(root, "out", "blog", "hello-world", "index.html")).should be_true
+        Dir.exists?(File.join(root, "dist")).should be_false
+      end
+    end
+
+    it "lets --output override the configured directory" do
+      with_tempdir do |dir|
+        root = Plombir::Scaffold::Site.new("site", dir).create
+        File.write(File.join(root, "plombir.yml"), "build:\n  output: out\n")
+
+        code = Plombir::CLI::Build.call(["--output", "custom"], root, IO::Memory.new, IO::Memory.new)
+
+        code.should eq(0)
+        Dir.exists?(File.join(root, "custom")).should be_true
+        Dir.exists?(File.join(root, "out")).should be_false
+      end
+    end
+
+    it "fails schema violations from config" do
+      with_tempdir do |dir|
+        root = Plombir::Scaffold::Site.new("site", dir).create
+        File.write(File.join(root, "plombir.yml"), "collections:\n  posts:\n    schema:\n      rating: {type: number, required: true}\n")
+        error = IO::Memory.new
+
+        code = Plombir::CLI::Build.call([] of String, root, IO::Memory.new, error)
+
+        code.should eq(1)
+        error.to_s.should contain("Schema validation failed")
+      end
+    end
+
+    it "warns on unknown keys and fails malformed values" do
+      with_tempdir do |dir|
+        root = Plombir::Scaffold::Site.new("site", dir).create
+        File.write(File.join(root, "plombir.yml"), "sponsor: me\n")
+        error = IO::Memory.new
+
+        code = Plombir::CLI::Build.call([] of String, root, IO::Memory.new, error)
+
+        code.should eq(0)
+        error.to_s.should contain(%(Unknown config key "sponsor"))
+      end
+
+      with_tempdir do |dir|
+        root = Plombir::Scaffold::Site.new("site", dir).create
+        File.write(File.join(root, "plombir.yml"), "site: nope\n")
+        error = IO::Memory.new
+
+        code = Plombir::CLI::Build.call([] of String, root, IO::Memory.new, error)
+
+        code.should eq(1)
+        error.to_s.should contain("Invalid configuration")
+      end
+    end
+  end
 end

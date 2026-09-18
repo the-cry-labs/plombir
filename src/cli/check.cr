@@ -45,7 +45,7 @@ module Plombir
           end
         end
 
-        issues = Plombir::Check::Runner.check(directory)
+        issues = Plombir::Check::Runner.check(directory, Plombir::Config.load_with_warnings(directory, error))
         print_report(issues, io)
 
         errors = issues.count(&.error?)

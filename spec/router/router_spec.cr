@@ -19,6 +19,14 @@ describe Plombir::Router do
     Plombir::Router.slugify("!!!").should eq("page")
   end
 
+  it "expands permalink patterns" do
+    date = Time.utc(2026, 3, 5, 10, 0, 0)
+
+    Plombir::Router.expand("/blog/:year/:slug/", "hello", "Hello", date).should eq("/blog/2026/hello/")
+    Plombir::Router.expand("blog/:year/:month/:day/:title", "hello", "Hello, World!", date).should eq("/blog/2026/03/05/hello-world/")
+    Plombir::Router.expand("/:slug", "hello", "Hello", date).should eq("/hello/")
+  end
+
   it "detects duplicate routes with both sources" do
     ex = expect_raises(Plombir::Router::Conflict) do
       Plombir::Router.routes([

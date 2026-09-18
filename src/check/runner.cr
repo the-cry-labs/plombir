@@ -12,9 +12,9 @@ module Plombir
     SECTIONS = ["Content", "Routes", "Links", "Assets", "SEO"]
 
     module Runner
-      # Checks the site at *root*, returning every issue in section
-      # order. Never touches the site's own `dist/`.
-      def self.check(root : String) : Array(Issue)
+      # Checks the site at *root* under *config*, returning every issue
+      # in section order. Never touches the site's own `dist/`.
+      def self.check(root : String, config : Config::Config) : Array(Issue)
         issues = ContentCheck.check(root)
         issues.concat(RoutesCheck.check(root))
         return issues if issues.any?(&.error?)
@@ -22,7 +22,8 @@ module Plombir
         tmp = File.join(Dir.tempdir, "plombir-check-#{Random::Secure.hex(8)}")
         Dir.mkdir_p(tmp)
         begin
-          Build::Pipeline.run(Build::Context.new(root, tmp))
+          context = Build::Context.new(root, tmp, false, config.schemas, config.permalink_patterns)
+          Build::Pipeline.run(context)
           issues.concat(LinksCheck.check(tmp))
           issues.concat(AssetsCheck.check(tmp))
           issues.concat(SeoCheck.check(tmp))

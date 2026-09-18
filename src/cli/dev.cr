@@ -40,14 +40,16 @@ module Plombir
         options = Serve.parse(args, DEFAULT_PORT, error, text)
         return 2 if options.nil?
 
-        context = Plombir::Build::Context.new(directory, "dist", false)
+        config = Plombir::Config.load_with_warnings(directory, error)
+        output = config.build.output
+        context = Plombir::Build::Context.new(directory, output, false, config.schemas, config.permalink_patterns)
         rebuilder = Plombir::Build::Incremental::Rebuilder.new(context)
         result = rebuilder.full
         Build.print_summary(result, io)
 
-        config = Plombir::Server::Config.new(File.join(directory, "dist"), options.host, options.port)
+        config_root = Plombir::Server::Config.new(File.join(directory, output), options.host, options.port)
         reloader = Plombir::LiveReload::Reloader.new
-        server = Plombir::Server::StaticServer.new(config, reloader)
+        server = Plombir::Server::StaticServer.new(config_root, reloader)
         begin
           server.listen
         rescue ex : Plombir::Server::PortInUse
@@ -56,7 +58,7 @@ module Plombir
         end
 
         io.puts ""
-        io.puts "Serving dist/ at #{config.url} (rebuilding on change)"
+        io.puts "Serving #{output}/ at #{config_root.url} (rebuilding on change)"
         io.puts "Watching content/ layouts/ public/ assets/ plombir.yml for changes"
         io.puts "Press Ctrl+C to stop"
         watcher = Plombir::Watcher::Watcher.new(directory)
@@ -75,6 +77,9 @@ module Plombir
         0
       rescue ex : Plombir::Build::Error | Plombir::Frontmatter::Error | Plombir::Router::Conflict | Plombir::Renderer::LayoutNotFound
         error.puts ex.message
+        1
+      rescue ex : Plombir::Config::Error
+        error.puts "✖ Invalid configuration\n\n#{ex.message}"
         1
       rescue ex : Exception
         error.puts "✖ Dev server failed\n\n#{ex.message}"

@@ -237,7 +237,7 @@ module Plombir
             next if Incremental.hash_file(File.join(@context.content_dir, relative)) == record.hash
 
             entries ||= Pipeline.discover(@context)
-            routes ||= Pipeline.resolve(entries.not_nil!)
+            routes ||= Pipeline.resolve(entries.not_nil!, @context.patterns)
             entry = entries.not_nil!.find { |e| e.page.relative_path == relative }
             return Targets.new(full: true, reason: "route set changed") if entry.nil?
             route = routes.not_nil![relative]
@@ -262,7 +262,7 @@ module Plombir
         # per-file breakdown sorted by source for stable log output.
         private def render_targets(targets : Array(String), graph : DependencyGraph) : Array(RebuiltFile)
           entries = Pipeline.discover(@context)
-          routes = Pipeline.resolve(entries)
+          routes = Pipeline.resolve(entries, @context.patterns)
           files = targets.map do |relative|
             started = Time.instant
             entry = entries.find! { |e| e.page.relative_path == relative }
@@ -294,7 +294,7 @@ module Plombir
 
         private def refresh_graph : Nil
           entries = Pipeline.discover(@context)
-          routes = Pipeline.resolve(entries)
+          routes = Pipeline.resolve(entries, @context.patterns)
           @graph = DependencyGraph.build(entries, routes)
           @graph.not_nil!.save(cache_path)
         end
