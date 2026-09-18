@@ -22,6 +22,18 @@ private def build_fixture(root : String) : Plombir::Build::Result
 end
 
 describe "content-model fixtures" do
+  it "minimal-site without plombir.yml builds and checks clean" do
+    with_tempdir do |dir|
+      root = copy_fixture("minimal-site", dir)
+      File.exists?(File.join(root, "plombir.yml")).should be_false
+
+      build_fixture(root).pages.should eq(3)
+      # No errors (exit 0); SEO warnings for the missing descriptions
+      # are the feature working, not breakage.
+      Plombir::Check::Runner.check(root, Plombir::Config.load(root)).none?(&.error?).should be_true
+    end
+  end
+
   it "blog-site builds clean and checks clean" do
     with_tempdir do |dir|
       root = copy_fixture("blog-site", dir)
