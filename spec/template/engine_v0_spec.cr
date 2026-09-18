@@ -77,8 +77,10 @@ describe Plombir::Template::EngineV0 do
 
     ex.file.should eq("layouts/default.html")
     ex.line.should eq(1)
+    ex.column.should eq(5)
     ex.message.to_s.should contain("✖ Invalid template")
     ex.message.to_s.should contain("layouts/default.html:1")
+    ex.message.to_s.should contain("layouts/default.html:1:5")
   end
 
   it "reports unterminated blocks with file and line" do
@@ -104,7 +106,9 @@ describe Plombir::Template::EngineV0 do
       Plombir::Template::EngineV0.render("hello{% end %}", Plombir::Template::EngineV0::Context.new, "page.html")
     end
 
+    ex.column.should eq(6)
     ex.message.to_s.should contain("without a matching")
+    ex.message.to_s.should contain("page.html:1:6")
   end
 
   it "rejects malformed for loops with an example" do
