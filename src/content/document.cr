@@ -44,8 +44,10 @@ module Plombir
 
       # Excerpt precedence: explicit `excerpt:` frontmatter, then the
       # body up to `<!--more-->`, then the first ~200 characters cut
-      # at a word boundary. Operates on the raw Markdown body;
-      # templates decide how to render or strip it.
+      # at a word boundary. The fallback skips leading blank lines and
+      # ATX headings (the title already shows beside the listing).
+      # Operates on the raw Markdown body; templates decide how to
+      # render or strip it.
       def self.excerpt(frontmatter : Frontmatter::Document, length : Int32 = 200) : String
         if explicit = frontmatter.string?("excerpt").try(&.strip)
           return explicit unless explicit.empty?
@@ -56,7 +58,7 @@ module Plombir
           return body[0...index].strip
         end
 
-        text = body.strip
+        text = body.lines.skip_while { |line| line.strip.empty? || line.matches?(/^\s{0,3}\#{1,6}\s+/) }.join.strip
         return text if text.size <= length
         cut = text[0, length]
         boundary = cut.rindex(/\s/)

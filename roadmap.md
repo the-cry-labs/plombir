@@ -238,10 +238,10 @@ Out of scope: full schema type system beyond string/date/number/bool/string[]; t
 
 ### 6.3 Acceptance criteria
 
-- [ ] Index template can list `posts` sorted newest-first with title/url/excerpt without custom code.
-- [ ] `permalink: /custom/url/` and collection pattern both produce correct `dist/` paths + canonical `url`.
-- [ ] `plombir check` on clean blog prints 5× `✓` + `No problems found.`; on broken fixture reports broken link (`about.md → /missing/`), missing image, bad date, duplicate route — each with file + hint.
-- [ ] Site without `plombir.yml` and without schemas builds and checks clean.
+- [x] Index template can list `posts` sorted newest-first with title/url/excerpt without custom code (`spec/fixtures/blog-site/expected/index.html`; `collections.*` stub per §6.1, full queries stay Phase-4).
+- [x] `permalink: /custom/url/` and collection pattern both produce correct `dist/` paths + canonical `url` (`spec/fixtures/permalink-site`, plus `/blog/:year/:slug/` across blog-site).
+- [x] `plombir check` on clean blog prints 5× `✓` + `No problems found.` (blog-site, asserted empty in `spec/content/fixtures_spec.cr`); on broken fixture reports broken link + missing image with file/line/hint (`spec/fixtures/broken-blog`); bad date and duplicate route report with file + hint on temp mutations (they break the build before output sections can run, so they assert separately in the same file).
+- [x] Site without `plombir.yml` and without schemas builds and checks clean (minimal-site: golden build plus no-errors check in `spec/content/fixtures_spec.cr`).
 
 ### 6.4 Exit gate
 

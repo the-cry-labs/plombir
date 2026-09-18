@@ -1,0 +1,12 @@
+site:
+  title: Test Blog
+  description: A fixture blog
+  url: https://blog.example.com/
+build:
+  output: dist
+collections:
+  posts:
+    permalink: /blog/:year/:slug/
+    schema:
+      title: {type: string, required: true}
+      date: {type: date, required: true}

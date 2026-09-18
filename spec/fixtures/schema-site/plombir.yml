@@ -1,0 +1,5 @@
+collections:
+  posts:
+    schema:
+      title: {type: string, required: true}
+      rating: {type: number}
