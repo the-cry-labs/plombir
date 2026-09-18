@@ -10,11 +10,25 @@ describe "golden fixtures" do
   it "builds empty-frontmatter byte-identical to expected/" do
     assert_golden("empty-frontmatter")
   end
+
+  it "builds blog-site byte-identical to expected/" do
+    assert_golden("blog-site")
+  end
+
+  it "builds permalink-site byte-identical to expected/" do
+    assert_golden("permalink-site")
+  end
+
+  it "builds schema-site byte-identical to expected/" do
+    assert_golden("schema-site")
+  end
 end
 
-# Copies the fixture (minus expected/) to a temp dir, builds it, and
-# either asserts dist/ against expected/ or regenerates expected/ when
-# REGENERATE_GOLDEN=1 (review the diff before committing).
+# Copies the fixture (minus expected/) to a temp dir, builds it with
+# its own plombir.yml when present (patterns, schemas, output dir —
+# like the CLI would), and either asserts dist/ against expected/ or
+# regenerates expected/ when REGENERATE_GOLDEN=1 (review the diff
+# before committing).
 private def assert_golden(name : String) : Nil
   fixture = File.join(FIXTURES_DIR, name)
   with_tempdir do |dir|
@@ -24,10 +38,12 @@ private def assert_golden(name : String) : Nil
       next if entry == "expected"
       FileUtils.cp_r(File.join(fixture, entry), File.join(root, entry))
     end
-    Plombir::Build::Pipeline.run(Plombir::Build::Context.new(root))
+    config = Plombir::Config.load(root)
+    context = Plombir::Build::Context.new(root, config.build.output, false, config.schemas, config.permalink_patterns)
+    Plombir::Build::Pipeline.run(context)
 
     expected = File.join(fixture, "expected")
-    actual = File.join(root, "dist")
+    actual = File.join(root, config.build.output)
     if ENV["REGENERATE_GOLDEN"]? == "1"
       FileUtils.rm_rf(expected)
       FileUtils.cp_r(actual, expected)

@@ -1,0 +1,3 @@
+collections:
+  posts:
+    permalink: /blog/:slug/

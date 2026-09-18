@@ -134,7 +134,7 @@ describe Plombir::Build::Pipeline do
     it "exposes collections newest-first by effective date" do
       with_tempdir do |dir|
         root = write_site(dir, {
-          "content/posts/new.md" => "---\ntitle: New\ndate: 2026-03-10\n---\n\n# New\n",
+          "content/posts/new.md" => "---\ntitle: New\ndate: 2026-03-10\n---\n\n# New\n\nNew body text\n",
           "content/posts/mid.md" => "---\ntitle: Mid\ndate: 2026-03-05\n---\n\n# Mid\n",
           "content/posts/old.md" => "---\ntitle: Old\ndate: 2026-01-01\n---\n\n# Old\n",
           # No explicit date: sorts by file mtime (now), per ADR-002.
