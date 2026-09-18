@@ -1,5 +1,6 @@
 # Plombir::Template::EngineV0 is the minimal layout renderer for the MVP slice.
 #
+# Pipeline: `Lexer.tokenize` → `Parser.parse` → render the `AST`.
 # It supports exactly four constructs (see `docs/adr/003-layout-slot.md`):
 # `{{ var }}` interpolation with dotted lookup, the raw `{{ content }}` slot,
 # `{% if %}` conditionals, and `{% for %}` loops. Everything else raises a
@@ -42,104 +43,47 @@ module Plombir
         rescue ex : Lexer::Error
           raise Error.new(file, ex.line, unclosed_message(file, ex.line, ex.column, ex.opener), ex.column)
         end
-        render_range(tokens, 0, tokens.size, context, Context.new, file)
+        # Structure failures raise `Error` out of the parser, so the
+        # renderer below only sees a valid tree.
+        render_nodes(Parser.parse(tokens, file), context, Context.new, file)
       end
 
-      # Renders the token slice `tokens[from...to]`.
-      private def self.render_range(tokens : Array(Lexer::Token), from : Int32, to : Int32, context : Context, scope : Context, file : String) : String
+      # Renders a node list. `scope` holds loop bindings shadowing
+      # `context` for the current block.
+      private def self.render_nodes(nodes : Array(AST::Node), context : Context, scope : Context, file : String) : String
         out = IO::Memory.new
-        cursor = from
 
-        while cursor < to
-          token = tokens[cursor]
-          if token.text?
-            out << token.value
-            cursor += 1
-          elsif token.variable?
-            if token.value.empty? || !(token.value =~ /\A[A-Za-z_][A-Za-z0-9_.]*\z/)
-              raise Error.new(file, token.line, variable_message(file, token.line, token.column), token.column)
-            end
-            out << resolve(token.value, context, scope, file, token.line, token.column)
-            cursor += 1
-          else
-            tag = token.value
-            if tag == "if" || tag.starts_with?("if ")
-              condition = tag.lchop("if").strip
-              if condition.empty? || !(condition =~ /\A[A-Za-z_][A-Za-z0-9_.]*\z/)
-                raise Error.new(file, token.line, if_message(file, token.line, token.column), token.column)
-              end
-              body_from, else_at, end_at = block_bounds(tokens, cursor, to, file)
-              body_to = else_at || end_at
-              if truthy?(lookup(condition, context, scope))
-                out << render_range(tokens, body_from, body_to, context, scope, file)
-              elsif else_at
-                out << render_range(tokens, else_at + 1, end_at, context, scope, file)
-              end
-              cursor = end_at + 1
-            elsif tag == "for" || tag.starts_with?("for ")
-              match = tag.match(/\Afor\s+([A-Za-z_][A-Za-z0-9_]*)\s+in\s+([A-Za-z_][A-Za-z0-9_.]*)\s*\z/)
-              unless match
-                raise Error.new(file, token.line, for_message(file, token.line, token.column), token.column)
-              end
-              body_from, else_at, end_at = block_bounds(tokens, cursor, to, file)
-              if else_at
-                raise Error.new(file, token.line, else_message(file, token.line, token.column), token.column)
-              end
-              collection = lookup(match[2], context, scope)
-              if list = collection.as?(Array(String))
-                list.each do |element|
-                  child = scope.dup
-                  child[match[1]] = element
-                  out << render_range(tokens, body_from, end_at, context, child, file)
-                end
-              elsif rows = collection.as?(Array(Hash(String, String)))
-                rows.each do |row|
-                  child = scope.dup
-                  row.each { |key, val| child["#{match[1]}.#{key}"] = val }
-                  out << render_range(tokens, body_from, end_at, context, child, file)
-                end
-              end
-              cursor = end_at + 1
-            elsif tag == "else" || tag == "end"
-              raise Error.new(file, token.line, stray_message(file, token.line, token.column, tag), token.column)
+        nodes.each do |node|
+          case node
+          when AST::Text
+            out << node.value
+          when AST::Variable
+            out << resolve(node.name, context, scope, file, node.line, node.column)
+          when AST::If
+            if truthy?(lookup(node.condition, context, scope))
+              out << render_nodes(node.body, context, scope, file)
             else
-              raise Error.new(file, token.line, unknown_message(file, token.line, token.column, tag), token.column)
+              out << render_nodes(node.else_body, context, scope, file)
+            end
+          when AST::For
+            collection = lookup(node.collection, context, scope)
+            if list = collection.as?(Array(String))
+              list.each do |element|
+                child = scope.dup
+                child[node.item] = element
+                out << render_nodes(node.body, context, child, file)
+              end
+            elsif rows = collection.as?(Array(Hash(String, String)))
+              rows.each do |row|
+                child = scope.dup
+                row.each { |key, val| child["#{node.item}.#{key}"] = val }
+                out << render_nodes(node.body, context, child, file)
+              end
             end
           end
         end
 
         out.to_s
-      end
-
-      # Finds the body of the block opened at token *open* (an `if`/`for`
-      # tag), returning `{body_from, else_at?, end_at}`. Nested blocks
-      # nest; a missing `{% end %}` fails at the opening tag.
-      private def self.block_bounds(tokens : Array(Lexer::Token), open : Int32, to : Int32, file : String) : Tuple(Int32, Int32?, Int32)
-        depth = 0
-        else_at : Int32? = nil
-        cursor = open + 1
-
-        while cursor < to
-          token = tokens[cursor]
-          if token.tag?
-            tag = token.value
-            if tag == "if" || tag.starts_with?("if ") || tag == "for" || tag.starts_with?("for ")
-              depth += 1
-            elsif tag == "end"
-              return {open + 1, else_at, cursor} if depth == 0
-              depth -= 1
-            elsif tag == "else" && depth == 0
-              if else_at
-                raise Error.new(file, token.line, else_message(file, token.line, token.column), token.column)
-              end
-              else_at = cursor
-            end
-          end
-          cursor += 1
-        end
-
-        opening = tokens[open]
-        raise Error.new(file, opening.line, unterminated_message(file, opening.line, opening.column), opening.column)
       end
 
       private def self.lookup(name : String, context : Context, scope : Context) : Value
@@ -194,7 +138,10 @@ module Plombir
         end
       end
 
-      private def self.variable_message(file : String, line : Int32, column : Int32) : String
+      # Diagnostic builders shared with `Parser` (it raises `Error`
+      # itself, so there is one message format). Item 2 promotes these
+      # to `TemplateError` with snippets and hints.
+      def self.variable_message(file : String, line : Int32, column : Int32) : String
         String.build do |io|
           io << "✖ Invalid template\n\n"
           io << loc(file, line, column) << "\n\n"
@@ -203,7 +150,7 @@ module Plombir
         end
       end
 
-      private def self.if_message(file : String, line : Int32, column : Int32) : String
+      def self.if_message(file : String, line : Int32, column : Int32) : String
         String.build do |io|
           io << "✖ Invalid template\n\n"
           io << loc(file, line, column) << "\n\n"
@@ -212,7 +159,7 @@ module Plombir
         end
       end
 
-      private def self.for_message(file : String, line : Int32, column : Int32) : String
+      def self.for_message(file : String, line : Int32, column : Int32) : String
         String.build do |io|
           io << "✖ Invalid template\n\n"
           io << loc(file, line, column) << "\n\n"
@@ -230,7 +177,7 @@ module Plombir
         end
       end
 
-      private def self.else_message(file : String, line : Int32, column : Int32) : String
+      def self.else_message(file : String, line : Int32, column : Int32) : String
         String.build do |io|
           io << "✖ Invalid template\n\n"
           io << loc(file, line, column) << "\n\n"
@@ -239,7 +186,7 @@ module Plombir
         end
       end
 
-      private def self.stray_message(file : String, line : Int32, column : Int32, tag : String) : String
+      def self.stray_message(file : String, line : Int32, column : Int32, tag : String) : String
         String.build do |io|
           io << "✖ Invalid template\n\n"
           io << loc(file, line, column) << "\n\n"
@@ -248,7 +195,7 @@ module Plombir
         end
       end
 
-      private def self.unknown_message(file : String, line : Int32, column : Int32, tag : String) : String
+      def self.unknown_message(file : String, line : Int32, column : Int32, tag : String) : String
         String.build do |io|
           io << "✖ Invalid template\n\n"
           io << loc(file, line, column) << "\n\n"
@@ -257,7 +204,7 @@ module Plombir
         end
       end
 
-      private def self.unterminated_message(file : String, line : Int32, column : Int32) : String
+      def self.unterminated_message(file : String, line : Int32, column : Int32) : String
         String.build do |io|
           io << "✖ Invalid template\n\n"
           io << loc(file, line, column) << "\n\n"

@@ -2,11 +2,13 @@
 #
 # Phase 4, item 1 (see `roadmap.md` §7.2): hand-written, no regex-soup
 # for structure — the scanner only looks for the ASCII delimiters
-# `{{`/`}}` and `{%`/`%}`. Every token carries a 1-based line and
-# column so later stages report `file:line:col` diagnostics.
+# `{{`/`}}`, `{%`/`%}`, and `{#`/`#}`. Every token carries a 1-based
+# line and column so later stages report `file:line:col` diagnostics.
 #
-# The v0 engine consumes these tokens directly; the full parser/AST
-# arrives in the next slice behind the same `render` call shape.
+# Comments (`{# ... #}`) never become tokens; the scanner drops them
+# and keeps tracking lines across them. The parser turns the rest
+# into `AST` nodes; the engine renders those behind its `render` call
+# shape.
 module Plombir
   module Template
     module Lexer
@@ -43,8 +45,9 @@ module Plombir
       end
 
       # Raised for structure the scanner cannot close (`{{` without
-      # `}}`, `{%` without `%}`). Carries no file — the caller owns
-      # the filename and wraps this into its own diagnostic.
+      # `}}`, `{%` without `%}`, `{#` without `#}`). Carries no file —
+      # the caller owns the filename and wraps this into its own
+      # diagnostic.
       class Error < Exception
         getter line : Int32
         getter column : Int32
@@ -72,16 +75,32 @@ module Plombir
         while pos < source.size
           var_open = source.index("{{", pos)
           tag_open = source.index("{%", pos)
-          next_open = nearest(var_open, tag_open)
+          comment_open = source.index("{#", pos)
+          next_open = nearest(nearest(var_open, tag_open), comment_open)
           unless next_open
             tokens << Token.new(Kind::Text, source[pos...source.size], text_line, text_column) if pos < source.size
             break
           end
 
-          # The tracker lags at the end of the previous tag, so catch
+          # The tracker lags at the end of the previous hole, so catch
           # it up across the text span before reading positions.
           line, line_start = advance(source, text_from, next_open, line, line_start)
           tokens << Token.new(Kind::Text, source[pos...next_open], text_line, text_column) if next_open > pos
+
+          if next_open == comment_open
+            token_line = line
+            token_column = next_open - line_start + 1
+            close = source.index("#}", next_open + 2)
+            unless close
+              raise Error.new(token_line, token_column, "{#")
+            end
+            line, line_start = advance(source, next_open, close + 2, line, line_start)
+            pos = close + 2
+            text_from = pos
+            text_line = line
+            text_column = pos - line_start + 1
+            next
+          end
 
           variable = next_open == var_open
           opener = variable ? "{{" : "{%"
