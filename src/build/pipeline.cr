@@ -179,8 +179,9 @@ module Plombir
 
       # Renders one page: Markdown body plus layout with page fields.
       # *collections* carries the `collections.*` template vars, so
-      # index pages list their siblings with no custom code.
-      def self.render_one(entry : Entry, route : Router::Route, context : Context, collections : Hash(String, Renderer::Page::Value)) : String
+      # index pages list their siblings with no custom code. It
+      # defaults to empty so single-page callers stay simple.
+      def self.render_one(entry : Entry, route : Router::Route, context : Context, collections : Hash(String, Renderer::Page::Value) = {} of String => Renderer::Page::Value) : String
         body = Markdown.render(entry.document.body)
         vars = Renderer::Page::Context.new
         slug = Router.slugify(File.basename(entry.page.relative_path, ".md"))

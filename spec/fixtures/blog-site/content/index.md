@@ -6,4 +6,4 @@ layout: home
 
 # Welcome
 
-Twelve posts, two of them drafts. The list below comes from `collections.posts` — newest first, no custom code.
+Ten published posts, two of them drafts. The list below comes from `collections.posts` — newest first, no custom code.

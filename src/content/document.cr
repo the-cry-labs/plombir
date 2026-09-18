@@ -55,14 +55,21 @@ module Plombir
 
         body = frontmatter.body
         if index = body.index(MORE_MARKER)
-          return body[0...index].strip
+          return strip_leading_headings(body[0...index]).strip
         end
 
-        text = body.lines.skip_while { |line| line.strip.empty? || line.matches?(/^\s{0,3}\#{1,6}\s+/) }.join.strip
+        text = strip_leading_headings(body).strip
         return text if text.size <= length
         cut = text[0, length]
         boundary = cut.rindex(/\s/)
         (boundary ? cut[0...boundary] : cut).strip
+      end
+
+      # Drops leading blank lines and ATX headings (`# Title`) so
+      # listings don't repeat the title shown beside them. Operates
+      # on raw Markdown lines; callers decide how to render the rest.
+      private def self.strip_leading_headings(text : String) : String
+        text.lines.skip_while { |line| line.strip.empty? || line.matches?(/^\s{0,3}\#{1,6}\s+/) }.join("\n")
       end
     end
   end

@@ -34,6 +34,18 @@ describe Plombir::Content::Document do
       Plombir::Content::Document.excerpt(frontmatter).should eq("Real start")
     end
 
+    it "keeps line breaks between fallback paragraphs" do
+      frontmatter = doc_parse("---\ntitle: T\n---\n\nFirst line\nSecond line\n")
+
+      Plombir::Content::Document.excerpt(frontmatter).should eq("First line\nSecond line")
+    end
+
+    it "skips leading headings before the more marker" do
+      frontmatter = doc_parse("---\ntitle: T\n---\n\n# Heading\n\nTeaser\n\n<!--more-->\n\nRest\n")
+
+      Plombir::Content::Document.excerpt(frontmatter).should eq("Teaser")
+    end
+
     it "keeps short bodies whole" do
       frontmatter = doc_parse("---\ntitle: T\n---\n\nShort body\n")
 
