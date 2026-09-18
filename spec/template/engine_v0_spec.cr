@@ -15,6 +15,10 @@ describe Plombir::Template::EngineV0 do
     Plombir::Template::EngineV0.render("<h1>{{ title }}</h1>", Plombir::Template::EngineV0::Context.new).should eq("<h1></h1>")
   end
 
+  it "drops comments from the output" do
+    Plombir::Template::EngineV0.render("a{# hidden #}b", Plombir::Template::EngineV0::Context.new).should eq("ab")
+  end
+
   it "resolves dotted names from flat keys" do
     context : Plombir::Template::EngineV0::Context = {"page.title" => "Hello"} of String => Plombir::Template::EngineV0::Value
     Plombir::Template::EngineV0.render("{{ page.title }}", context).should eq("Hello")

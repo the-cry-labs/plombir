@@ -70,4 +70,36 @@ describe Plombir::Template::Lexer do
     ex.column.should eq(1)
     ex.opener.should eq("{%")
   end
+
+  it "drops comments instead of tokenizing them" do
+    tokens = Plombir::Template::Lexer.tokenize("a{# hidden #}b")
+
+    tokens.map(&.kind).should eq([
+      Plombir::Template::Lexer::Kind::Text,
+      Plombir::Template::Lexer::Kind::Text,
+    ])
+    tokens[0].value.should eq("a")
+    tokens[1].value.should eq("b")
+  end
+
+  it "tracks lines across multiline comments" do
+    tokens = Plombir::Template::Lexer.tokenize("{# one\ntwo #}\n{{ x }}")
+
+    tokens.size.should eq(2)
+    tokens[0].value.should eq("\n")
+    var = tokens[1]
+    var.variable?.should be_true
+    var.line.should eq(3)
+    var.column.should eq(1)
+  end
+
+  it "raises unclosed comments with position" do
+    ex = expect_raises(Plombir::Template::Lexer::Error) do
+      Plombir::Template::Lexer.tokenize("ab {# never closed")
+    end
+
+    ex.line.should eq(1)
+    ex.column.should eq(4)
+    ex.opener.should eq("{#")
+  end
 end
