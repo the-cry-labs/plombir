@@ -263,13 +263,14 @@ module Plombir
         private def render_targets(targets : Array(String), graph : DependencyGraph) : Array(RebuiltFile)
           entries = Pipeline.discover(@context)
           routes = Pipeline.resolve(entries, @context.patterns)
+          collections = Pipeline.collection_vars(entries, routes)
           files = targets.map do |relative|
             started = Time.instant
             entry = entries.find! { |e| e.page.relative_path == relative }
             route = routes[relative]
             destination = File.join(@context.output_dir, route.output_path)
             Dir.mkdir_p(File.dirname(destination))
-            File.write(destination, Pipeline.render_one(entry, route, @context))
+            File.write(destination, Pipeline.render_one(entry, route, @context, collections))
 
             record = graph.pages[relative]
             old_layout = record.layout

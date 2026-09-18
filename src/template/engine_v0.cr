@@ -10,10 +10,12 @@
 module Plombir
   module Template
     module EngineV0
-      # Values a layout can interpolate. Contexts stay flat: dotted names
-      # such as `page.title` are plain keys populated by the caller
-      # (`Plombir::Renderer::Page` aliases top-level keys as `page.*`).
-      alias Value = String | Array(String) | Bool | Nil
+      # Values a layout can interpolate. Contexts stay flat: dotted
+      # names such as `page.title` are plain keys populated by the
+      # caller. Collection rows are string maps under flat
+      # `collections.<name>` keys; looping is the only way to read
+      # them — direct interpolation raises a helpful error.
+      alias Value = String | Array(String) | Array(Hash(String, String)) | Bool | Nil
       alias Context = Hash(String, Value)
 
       # Raised for any tag the v0 engine cannot understand.
@@ -60,7 +62,7 @@ module Plombir
             if expr.empty? || !(expr =~ /\A[A-Za-z_][A-Za-z0-9_.]*\z/)
               raise Error.new(file, line_at(source, next_open), variable_message(file, line_at(source, next_open)))
             end
-            out << resolve(expr, context, scope)
+            out << resolve(expr, context, scope, file, line_at(source, next_open))
             pos = close + 2
           else
             close = source.index("%}", next_open + 2)
@@ -91,10 +93,17 @@ module Plombir
               if else_body
                 raise Error.new(file, line_at(source, next_open), else_message(file, line_at(source, next_open)))
               end
-              if list = lookup(match[2], context, scope).as?(Array(String))
+              collection = lookup(match[2], context, scope)
+              if list = collection.as?(Array(String))
                 list.each do |element|
                   child = scope.dup
                   child[match[1]] = element
+                  out << render_string(body, context, child, file)
+                end
+              elsif rows = collection.as?(Array(Hash(String, String)))
+                rows.each do |row|
+                  child = scope.dup
+                  row.each { |key, val| child["#{match[1]}.#{key}"] = val }
                   out << render_string(body, context, child, file)
                 end
               end
@@ -164,12 +173,15 @@ module Plombir
 
       # `{{ content }}` (and any `*.content`) is raw HTML; every other
       # variable is escaped. Missing variables render as empty strings.
-      private def self.resolve(name : String, context : Context, scope : Context) : String
+      private def self.resolve(name : String, context : Context, scope : Context, file : String, line : Int32) : String
         value = lookup(name, context, scope)
         return "" if value.nil?
         return value ? "true" : "false" if value.is_a?(Bool)
         if value.is_a?(Array(String))
           return value.map { |entry| escape(entry) }.join(", ")
+        end
+        if value.is_a?(Array(Hash(String, String)))
+          raise Error.new(file, line, collection_message(file, line, name))
         end
         raw?(name) ? value : escape(value)
       end
@@ -232,6 +244,15 @@ module Plombir
           io << file << ":" << line << "\n\n"
           io << "Expected `{% for item in list %}`.\n\n"
           io << "Example:\n{% for tag in tags %}<span>{{ tag }}</span>{% end %}\n"
+        end
+      end
+
+      private def self.collection_message(file : String, line : Int32, name : String) : String
+        String.build do |io|
+          io << "✖ Cannot interpolate a collection\n\n"
+          io << file << ":" << line << "\n\n"
+          io << "{{ " << name << " }} is a list of pages. Loop over it instead:\n\n"
+          io << "Example:\n{% for post in " << name << " %}{{ post.title }}{% end %}\n"
         end
       end
 

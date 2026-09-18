@@ -130,6 +130,32 @@ describe Plombir::Build::Pipeline do
       Dir.exists?(File.join(dir, "dist")).should be_true
     end
   end
+  describe ".collection_vars" do
+    it "exposes collections newest-first by effective date" do
+      with_tempdir do |dir|
+        root = write_site(dir, {
+          "content/posts/new.md" => "---\ntitle: New\ndate: 2026-03-10\n---\n\n# New\n",
+          "content/posts/mid.md" => "---\ntitle: Mid\ndate: 2026-03-05\n---\n\n# Mid\n",
+          "content/posts/old.md" => "---\ntitle: Old\ndate: 2026-01-01\n---\n\n# Old\n",
+          # No explicit date: sorts by file mtime (now), per ADR-002.
+          "content/posts/undated.md" => "---\ntitle: Undated\n---\n\n# Undated\n",
+          "content/index.md"         => "---\ntitle: Home\n---\n\n# Home\n",
+        })
+        context = Plombir::Build::Context.new(root)
+        entries = Plombir::Build::Pipeline.discover(context)
+        routes = Plombir::Build::Pipeline.resolve(entries)
+
+        vars = Plombir::Build::Pipeline.collection_vars(entries, routes)
+        posts = vars["collections.posts"].as(Array(Hash(String, String)))
+
+        posts.map { |row| row["title"] }.should eq(["Undated", "New", "Mid", "Old"])
+        posts.map { |row| row["url"] }.should eq(["/posts/undated/", "/posts/new/", "/posts/mid/", "/posts/old/"])
+        posts[1]["date"].should eq("2026-03-10")
+        posts[1]["excerpt"].should contain("New")
+        vars["collections.root"].as(Array(Hash(String, String))).first["title"].should eq("Home")
+      end
+    end
+  end
 end
 
 private def write_site(root : String, files : Hash(String, String)) : String

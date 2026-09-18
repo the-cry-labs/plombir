@@ -44,6 +44,26 @@ describe Plombir::Template::EngineV0 do
     Plombir::Template::EngineV0.render("{% for tag in missing %}x{% end %}", context).should eq("")
   end
 
+  it "loops over collection rows with flat field binding" do
+    rows = [{"title" => "B", "url" => "/b/"}, {"title" => "A", "url" => "/a/"}]
+    context : Plombir::Template::EngineV0::Context = {"collections.posts" => rows} of String => Plombir::Template::EngineV0::Value
+    template = "{% for post in collections.posts %}<a href=\"{{ post.url }}\">{{ post.title }}</a>{% end %}"
+    Plombir::Template::EngineV0.render(template, context).should eq("<a href=\"/b/\">B</a><a href=\"/a/\">A</a>")
+    Plombir::Template::EngineV0.render("{{ post.title }}", context).should eq("")
+  end
+
+  it "refuses to interpolate collections directly" do
+    rows = [{"title" => "A", "url" => "/a/"}]
+    context : Plombir::Template::EngineV0::Context = {"collections.posts" => rows} of String => Plombir::Template::EngineV0::Value
+    ex = expect_raises(Plombir::Template::EngineV0::Error) do
+      Plombir::Template::EngineV0.render("{{ collections.posts }}", context, "layouts/home.html")
+    end
+
+    ex.message.to_s.should contain("Cannot interpolate a collection")
+    ex.message.to_s.should contain("layouts/home.html")
+    ex.message.to_s.should contain("{% for post in collections.posts %}")
+  end
+
   it "nests conditionals inside loops" do
     context : Plombir::Template::EngineV0::Context = {"show" => "true", "items" => ["a", "b"]} of String => Plombir::Template::EngineV0::Value
     template = "{% for item in items %}{% if show %}[{{ item }}]{% end %}{% end %}"

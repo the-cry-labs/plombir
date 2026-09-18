@@ -133,16 +133,54 @@ module Plombir
       ) : Nil
         FileUtils.rm_rf(context.output_dir)
         Dir.mkdir_p(context.output_dir)
+        collections = collection_vars(entries, routes)
         entries.each do |entry|
           route = routes[entry.page.relative_path]
           destination = File.join(context.output_dir, route.output_path)
           Dir.mkdir_p(File.dirname(destination))
-          File.write(destination, render_one(entry, route, context))
+          File.write(destination, render_one(entry, route, context, collections))
         end
       end
 
+      # Builds the `collections.<name>` template vars: per-collection
+      # rows newest-first by effective date (explicit `date:`, else the
+      # file mtime per ADR-002) with title/url/excerpt/date. The Phase-3 stub for template
+      # listings — full query helpers arrive with the Phase-4 engine.
+      def self.collection_vars(entries : Array(Entry), routes : Hash(String, Router::Route)) : Hash(String, Renderer::Page::Value)
+        grouped = Hash(String, Array(Tuple(Time?, String, Hash(String, String)))).new do |hash, key|
+          hash[key] = [] of Tuple(Time?, String, Hash(String, String))
+        end
+        entries.each do |entry|
+          relative = entry.page.relative_path
+          slug = Router.slugify(File.basename(relative, ".md"))
+          date = entry.document.date(entry.page.mtime)
+          row = {
+            "title"   => entry.document.title(slug),
+            "url"     => routes[relative].url,
+            "excerpt" => Content::Document.excerpt(entry.document),
+            "date"    => date ? date.to_s("%Y-%m-%d") : "",
+          }
+          grouped[Content::Collection.collection_name(relative)] << {date, relative, row}
+        end
+
+        vars = {} of String => Renderer::Page::Value
+        grouped.each do |name, list|
+          list.sort! do |(date_a, relative_a, _), (date_b, relative_b, _)|
+            dated = (date_a.nil? ? 1 : 0) <=> (date_b.nil? ? 1 : 0)
+            next dated unless dated == 0
+            recent = (date_b.try(&.to_unix) || 0_i64) <=> (date_a.try(&.to_unix) || 0_i64)
+            next recent unless recent == 0
+            relative_a <=> relative_b
+          end
+          vars["collections.#{name}"] = list.map { |(_, _, row)| row }
+        end
+        vars
+      end
+
       # Renders one page: Markdown body plus layout with page fields.
-      def self.render_one(entry : Entry, route : Router::Route, context : Context) : String
+      # *collections* carries the `collections.*` template vars, so
+      # index pages list their siblings with no custom code.
+      def self.render_one(entry : Entry, route : Router::Route, context : Context, collections : Hash(String, Renderer::Page::Value)) : String
         body = Markdown.render(entry.document.body)
         vars = Renderer::Page::Context.new
         slug = Router.slugify(File.basename(entry.page.relative_path, ".md"))
@@ -151,6 +189,7 @@ module Plombir
         vars["date"] = format_date(entry.document.date(entry.page.mtime))
         vars["tags"] = entry.document.tags
         vars["url"] = route.url
+        collections.each { |key, value| vars[key] = value }
         Renderer::Page.render_file(body, entry.document.layout, context.layouts_dir, vars, entry.page.relative_path)
       end
 
