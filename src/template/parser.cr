@@ -3,20 +3,22 @@
 #
 # Recursive descent over the v0 surface: text, dotted-name variables,
 # `{% if %}`/`{% else %}`/`{% end %}`, `{% for %}`/`{% end %}`.
-# Structure failures raise `EngineV0::Error` directly — the message
-# builders live on `EngineV0` until item 2 promotes diagnostics to
-# `TemplateError`, so there is exactly one diagnostic format.
+# Structure failures raise `Template::Error` via `Errors` (one shared
+# diagnostic format with the source line appended).
 module Plombir
   module Template
     module Parser
       # Parses *tokens* (from `Lexer.tokenize`) into a node list.
+      # *lines* is the template split on `\n`, used for the source-line
+      # footer in diagnostics.
       #
       # ```
-      # tokens = Lexer.tokenize("{% if x %}y{% end %}")
-      # Parser.parse(tokens, "page.html").size # => 1
+      # source = "{% if x %}y{% end %}"
+      # tokens = Lexer.tokenize(source)
+      # Parser.parse(tokens, "page.html", source.split('\n')).size # => 1
       # ```
-      def self.parse(tokens : Array(Lexer::Token), file : String = "<input>") : Array(AST::Node)
-        Runner.new(tokens, file).parse_template
+      def self.parse(tokens : Array(Lexer::Token), file : String = "<input>", lines : Array(String) = [] of String) : Array(AST::Node)
+        Runner.new(tokens, file, lines).parse_template
       end
 
       # A dotted lookup name: `title`, `post.title`. Flat contexts
@@ -33,7 +35,7 @@ module Plombir
       end
 
       private class Runner
-        def initialize(@tokens : Array(Lexer::Token), @file : String)
+        def initialize(@tokens : Array(Lexer::Token), @file : String, @lines : Array(String))
           @pos = 0
         end
 
@@ -41,7 +43,7 @@ module Plombir
           nodes = parse_list
           if @pos < @tokens.size
             token = @tokens[@pos]
-            fail(token.line, token.column, EngineV0.stray_message(@file, token.line, token.column, token.value))
+            fail(token.line, token.column, Errors.stray_message(@file, token.line, token.column, token.value))
           end
           nodes
         end
@@ -66,7 +68,7 @@ module Plombir
           end
           if token.variable?
             unless Parser.name?(token.value)
-              fail(token.line, token.column, EngineV0.variable_message(@file, token.line, token.column))
+              fail(token.line, token.column, Errors.variable_message(@file, token.line, token.column))
             end
             @pos += 1
             return AST::Variable.new(token.value, token.line, token.column)
@@ -79,16 +81,16 @@ module Plombir
           return parse_if(token) if tag == "if" || tag.starts_with?("if ")
           return parse_for(token) if tag == "for" || tag.starts_with?("for ")
           if tag == "else" || tag == "end"
-            fail(token.line, token.column, EngineV0.stray_message(@file, token.line, token.column, tag))
+            fail(token.line, token.column, Errors.stray_message(@file, token.line, token.column, tag))
           else
-            fail(token.line, token.column, EngineV0.unknown_message(@file, token.line, token.column, tag))
+            fail(token.line, token.column, Errors.unknown_message(@file, token.line, token.column, tag))
           end
         end
 
         private def parse_if(opening : Lexer::Token) : AST::If
           condition = opening.value.lchop("if").strip
           unless Parser.name?(condition)
-            fail(opening.line, opening.column, EngineV0.if_message(@file, opening.line, opening.column))
+            fail(opening.line, opening.column, Errors.if_message(@file, opening.line, opening.column))
           end
           @pos += 1
           body = parse_list
@@ -98,11 +100,11 @@ module Plombir
             else_body = parse_list
             if terminator?("else")
               dup = @tokens[@pos]
-              fail(dup.line, dup.column, EngineV0.else_message(@file, dup.line, dup.column))
+              fail(dup.line, dup.column, Errors.else_message(@file, dup.line, dup.column))
             end
           end
           unless terminator?("end")
-            fail(opening.line, opening.column, EngineV0.unterminated_message(@file, opening.line, opening.column))
+            fail(opening.line, opening.column, Errors.unterminated_message(@file, opening.line, opening.column))
           end
           @pos += 1
           AST::If.new(condition, body, else_body, opening.line, opening.column)
@@ -112,15 +114,15 @@ module Plombir
           parts = opening.value.split
           unless parts.size == 4 && parts[0] == "for" && parts[2] == "in" &&
                  Parser.plain_name?(parts[1]) && Parser.name?(parts[3])
-            fail(opening.line, opening.column, EngineV0.for_message(@file, opening.line, opening.column))
+            fail(opening.line, opening.column, Errors.for_message(@file, opening.line, opening.column))
           end
           @pos += 1
           body = parse_list
           if terminator?("else")
-            fail(opening.line, opening.column, EngineV0.else_message(@file, opening.line, opening.column))
+            fail(opening.line, opening.column, Errors.else_message(@file, opening.line, opening.column))
           end
           unless terminator?("end")
-            fail(opening.line, opening.column, EngineV0.unterminated_message(@file, opening.line, opening.column))
+            fail(opening.line, opening.column, Errors.unterminated_message(@file, opening.line, opening.column))
           end
           @pos += 1
           AST::For.new(parts[1], parts[3], body, opening.line, opening.column)
@@ -131,7 +133,7 @@ module Plombir
         end
 
         private def fail(line : Int32, column : Int32, message : String) : NoReturn
-          raise EngineV0::Error.new(@file, line, message, column)
+          Errors.fail(@file, @lines, line, column, message)
         end
       end
     end

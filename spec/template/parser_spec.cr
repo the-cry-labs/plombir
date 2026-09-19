@@ -1,11 +1,11 @@
 require "../spec_helper"
 
 private def parse(source : String, file : String = "page.html") : Array(Plombir::Template::AST::Node)
-  Plombir::Template::Parser.parse(Plombir::Template::Lexer.tokenize(source), file)
+  Plombir::Template::Parser.parse(Plombir::Template::Lexer.tokenize(source), file, source.split('\n'))
 end
 
-private def parse_error(source : String, file : String = "page.html") : Plombir::Template::EngineV0::Error
-  expect_raises(Plombir::Template::EngineV0::Error) do
+private def parse_error(source : String, file : String = "page.html") : Plombir::Template::Error
+  expect_raises(Plombir::Template::Error) do
     parse(source, file)
   end
 end
@@ -80,6 +80,7 @@ describe Plombir::Template::Parser do
     ex.line.should eq(1)
     ex.column.should eq(6)
     ex.message.to_s.should contain("without a matching")
+    ex.message.to_s.should contain("1 │ hello{% end %}")
   end
 
   it "points missing ends at the opening tag" do
