@@ -37,6 +37,69 @@ describe Plombir::Renderer::Page do
     end
   end
 
+  it "nests layouts through frontmatter parents" do
+    with_tempdir do |dir|
+      layouts = File.join(dir, "layouts")
+      Dir.mkdir_p(layouts)
+      File.write(File.join(layouts, "default.html"), "<html>{{ content }}</html>")
+      File.write(File.join(layouts, "post.html"), "---\nlayout: default\n---\n<article>{{ content }}</article>")
+
+      vars : Plombir::Renderer::Page::Context = {"title" => "Hi"} of String => Plombir::Renderer::Page::Value
+      Plombir::Renderer::Page.render_file("<p>Hi.</p>", "post", layouts, vars, "content/a.md").should eq(
+        "<html><article><p>Hi.</p></article></html>"
+      )
+    end
+  end
+
+  it "names the missing parent for broken chains" do
+    with_tempdir do |dir|
+      layouts = File.join(dir, "layouts")
+      Dir.mkdir_p(layouts)
+      File.write(File.join(layouts, "post.html"), "---\nlayout: default\n---\n<article>{{ content }}</article>")
+
+      ex = expect_raises(Plombir::Renderer::LayoutNotFound) do
+        Plombir::Renderer::Page.render_file("body", "post", layouts, Plombir::Renderer::Page::Context.new, "content/a.md")
+      end
+
+      ex.layout.should eq("default")
+      ex.message.to_s.should contain("\"default\"")
+    end
+  end
+
+  it "rejects chains deeper than the guard" do
+    with_tempdir do |dir|
+      layouts = File.join(dir, "layouts")
+      Dir.mkdir_p(layouts)
+      10.times do |i|
+        File.write(File.join(layouts, "l#{i}.html"), "---\nlayout: l#{i + 1}\n---\n[#{i}]{{ content }}")
+      end
+
+      ex = expect_raises(Plombir::Renderer::LayoutChainTooDeep) do
+        Plombir::Renderer::Page.render_file("body", "l0", layouts, Plombir::Renderer::Page::Context.new, "content/a.md")
+      end
+
+      ex.chain.size.should eq(11)
+      ex.file.should eq("content/a.md")
+      ex.message.to_s.should contain("max 10")
+      ex.message.to_s.should contain("l0 → l1")
+      ex.message.to_s.should contain("l9 → l10")
+    end
+  end
+
+  it "rejects layouts that parent themselves" do
+    with_tempdir do |dir|
+      layouts = File.join(dir, "layouts")
+      Dir.mkdir_p(layouts)
+      File.write(File.join(layouts, "post.html"), "---\nlayout: post\n---\n<article>{{ content }}</article>")
+
+      ex = expect_raises(Plombir::Renderer::LayoutChainTooDeep) do
+        Plombir::Renderer::Page.render_file("body", "post", layouts, Plombir::Renderer::Page::Context.new, "content/a.md")
+      end
+
+      ex.message.to_s.should contain("post → post")
+    end
+  end
+
   it "lists available layouts for unknown names" do
     with_tempdir do |dir|
       layouts = File.join(dir, "layouts")
