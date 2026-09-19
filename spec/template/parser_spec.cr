@@ -145,6 +145,80 @@ describe Plombir::Template::Parser do
     ex.message.to_s.should contain("Expected `{% for item in list %}`")
   end
 
+  it "parses elsif branches in source order" do
+    nodes = parse("{% if a %}1{% elsif b %}2{% elsif c %}3{% else %}4{% end %}")
+
+    nodes.size.should eq(1)
+    cond = nodes[0].as(Plombir::Template::AST::If)
+    cond.condition.should eq("a")
+    cond.elsifs.map(&.condition).should eq(["b", "c"])
+    cond.elsifs[0].body.size.should eq(1)
+    cond.elsifs[0].line.should eq(1)
+    cond.elsifs[0].column.should eq(12)
+    cond.else?.should be_true
+  end
+
+  it "parses if/elsif without an else" do
+    nodes = parse("{% if a %}x{% elsif b %}y{% end %}")
+
+    cond = nodes[0].as(Plombir::Template::AST::If)
+    cond.elsifs.size.should eq(1)
+    cond.else?.should be_false
+  end
+
+  it "rejects empty elsif conditions" do
+    ex = parse_error("{% if a %}x{% elsif %}y{% end %}")
+
+    ex.message.to_s.should contain("Expected `{% elsif variable %}`")
+  end
+
+  it "rejects elsif after else at the elsif tag" do
+    ex = parse_error("{% if a %}x{% else %}y{% elsif b %}z{% end %}")
+
+    ex.column.should eq(23)
+    ex.message.to_s.should contain("must come before `{% else %}`")
+  end
+
+  it "rejects stray elsif at the top level" do
+    ex = parse_error("ok{% elsif x %}")
+
+    ex.message.to_s.should contain("without a matching")
+  end
+
+  it "rejects elsif inside for at the for tag" do
+    ex = parse_error("{% for t in tags %}x{% elsif y %}z{% end %}")
+
+    ex.line.should eq(1)
+    ex.column.should eq(1)
+    ex.message.to_s.should contain("only valid directly inside `{% if %}`")
+  end
+
+  it "parses for limit and offset in either order" do
+    headed = parse("{% for post in posts limit:5 offset:10 %}x{% end %}")
+    tailed = parse("{% for post in posts offset:10 limit:5 %}x{% end %}")
+
+    [headed, tailed].each do |nodes|
+      loop = nodes[0].as(Plombir::Template::AST::For)
+      loop.limit.should eq(5)
+      loop.offset.should eq(10)
+    end
+  end
+
+  it "defaults for limit to nil and offset to zero" do
+    loop = parse("{% for t in tags %}x{% end %}")[0].as(Plombir::Template::AST::For)
+
+    loop.limit.should be_nil
+    loop.offset.should eq(0)
+  end
+
+  it "rejects bad for options" do
+    ["limit:x", "limit:-1", "limit:5 limit:2", "offset:1 offset:2", "bogus:1", "limit:"].each do |option|
+      ex = parse_error("{% for t in tags #{option} %}x{% end %}")
+
+      ex.message.to_s.should contain("Expected `{% for item in list %}`")
+    end
+  end
+
   it "rejects dotted loop variables" do
     ex = parse_error("{% for a.b in c %}x{% end %}")
 

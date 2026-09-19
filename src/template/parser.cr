@@ -2,9 +2,10 @@
 # nodes (roadmap Phase 4, item 1).
 #
 # Recursive descent over the v0 surface: text, dotted-name variables,
-# `{% if %}`/`{% else %}`/`{% end %}`, `{% for %}`/`{% end %}`.
-# Structure failures raise `Template::Error` via `Errors` (one shared
-# diagnostic format with the source line appended).
+# `{% if %}`/`{% elsif %}`/`{% else %}`/`{% end %}`,
+# `{% for %}` (with `limit:N`/`offset:N`)/`{% end %}`. Structure
+# failures raise `Template::Error` via `Errors` (one shared diagnostic
+# format with the source line appended).
 module Plombir
   module Template
     module Parser
@@ -34,6 +35,12 @@ module Plombir
         text.matches?(/\A[A-Za-z_][A-Za-z0-9_]*\z/)
       end
 
+      # An `{% elsif %}` opener: exactly `elsif` or `elsif <name>`.
+      # Name validity is checked when the branch itself parses.
+      def self.elsif_tag?(text : String) : Bool
+        text == "elsif" || text.starts_with?("elsif ")
+      end
+
       private class Runner
         def initialize(@tokens : Array(Lexer::Token), @file : String, @lines : Array(String))
           @pos = 0
@@ -48,13 +55,13 @@ module Plombir
           nodes
         end
 
-        # Parses nodes until an `else`/`end` terminator or the end of
-        # input. The terminator stays unread — the caller owns it.
+        # Parses nodes until an `elsif`/`else`/`end` terminator or the
+        # end of input. The terminator stays unread — the caller owns it.
         private def parse_list : Array(AST::Node)
           nodes = [] of AST::Node
           while @pos < @tokens.size
             token = @tokens[@pos]
-            break if token.tag? && (token.value == "else" || token.value == "end")
+            break if token.tag? && (token.value == "else" || token.value == "end" || Parser.elsif_tag?(token.value))
             nodes << parse_node
           end
           nodes
@@ -80,7 +87,7 @@ module Plombir
           tag = token.value
           return parse_if(token) if tag == "if" || tag.starts_with?("if ")
           return parse_for(token) if tag == "for" || tag.starts_with?("for ")
-          if tag == "else" || tag == "end"
+          if tag == "else" || tag == "end" || Parser.elsif_tag?(tag)
             fail(token.line, token.column, Errors.stray_message(@file, token.line, token.column, tag))
           else
             fail(token.line, token.column, Errors.unknown_message(@file, token.line, token.column, tag))
@@ -94,6 +101,12 @@ module Plombir
           end
           @pos += 1
           body = parse_list
+          elsifs = [] of AST::ElsifBranch
+          while @pos < @tokens.size
+            token = @tokens[@pos]
+            break unless token.tag? && Parser.elsif_tag?(token.value)
+            elsifs << parse_elsif(token)
+          end
           else_body = [] of AST::Node
           if terminator?("else")
             @pos += 1
@@ -102,30 +115,76 @@ module Plombir
               dup = @tokens[@pos]
               fail(dup.line, dup.column, Errors.else_message(@file, dup.line, dup.column))
             end
+            if @pos < @tokens.size
+              token = @tokens[@pos]
+              if token.tag? && Parser.elsif_tag?(token.value)
+                fail(token.line, token.column, Errors.elsif_order_message(@file, token.line, token.column))
+              end
+            end
           end
           unless terminator?("end")
             fail(opening.line, opening.column, Errors.unterminated_message(@file, opening.line, opening.column))
           end
           @pos += 1
-          AST::If.new(condition, body, else_body, opening.line, opening.column)
+          AST::If.new(condition, body, elsifs, else_body, opening.line, opening.column)
+        end
+
+        private def parse_elsif(opening : Lexer::Token) : AST::ElsifBranch
+          condition = opening.value.lchop("elsif").strip
+          unless Parser.name?(condition)
+            fail(opening.line, opening.column, Errors.elsif_message(@file, opening.line, opening.column))
+          end
+          @pos += 1
+          AST::ElsifBranch.new(condition, parse_list, opening.line, opening.column)
         end
 
         private def parse_for(opening : Lexer::Token) : AST::For
           parts = opening.value.split
-          unless parts.size == 4 && parts[0] == "for" && parts[2] == "in" &&
+          unless parts.size >= 4 && parts[0] == "for" && parts[2] == "in" &&
                  Parser.plain_name?(parts[1]) && Parser.name?(parts[3])
             fail(opening.line, opening.column, Errors.for_message(@file, opening.line, opening.column))
           end
+          limit, offset = parse_window(parts[4..], opening)
           @pos += 1
           body = parse_list
           if terminator?("else")
             fail(opening.line, opening.column, Errors.else_message(@file, opening.line, opening.column))
           end
+          if @pos < @tokens.size
+            token = @tokens[@pos]
+            if token.tag? && Parser.elsif_tag?(token.value)
+              fail(opening.line, opening.column, Errors.else_message(@file, opening.line, opening.column))
+            end
+          end
           unless terminator?("end")
             fail(opening.line, opening.column, Errors.unterminated_message(@file, opening.line, opening.column))
           end
           @pos += 1
-          AST::For.new(parts[1], parts[3], body, opening.line, opening.column)
+          AST::For.new(parts[1], parts[3], body, limit, offset, opening.line, opening.column)
+        end
+
+        # Reads trailing `limit:N` / `offset:N` loop options (either
+        # order, each at most once). Anything else is a `for` header
+        # error pointing back at the opening tag.
+        private def parse_window(options : Array(String), opening : Lexer::Token) : Tuple(Int32?, Int32)
+          limit : Int32? = nil
+          offset = 0
+          seen_limit = false
+          seen_offset = false
+          options.each do |option|
+            key, _, number = option.partition(":")
+            value = number.to_i?(whitespace: false)
+            if key == "limit" && !seen_limit && !value.nil? && value >= 0
+              limit = value
+              seen_limit = true
+            elsif key == "offset" && !seen_offset && !value.nil? && value >= 0
+              offset = value
+              seen_offset = true
+            else
+              fail(opening.line, opening.column, Errors.for_message(@file, opening.line, opening.column))
+            end
+          end
+          {limit, offset}
         end
 
         private def terminator?(word : String) : Bool

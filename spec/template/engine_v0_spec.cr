@@ -48,6 +48,49 @@ describe Plombir::Template::EngineV0 do
     Plombir::Template::EngineV0.render("{% for tag in missing %}x{% end %}", context).should eq("")
   end
 
+  it "renders the first truthy elsif branch" do
+    context = {"a" => "", "b" => "yes", "c" => "yes"} of String => Plombir::Template::EngineV0::Value
+    template = "{% if a %}1{% elsif b %}2{% elsif c %}3{% else %}4{% end %}"
+
+    Plombir::Template::EngineV0.render(template, context).should eq("2")
+  end
+
+  it "falls through elsif branches to else" do
+    context = {"a" => "", "b" => ""} of String => Plombir::Template::EngineV0::Value
+
+    Plombir::Template::EngineV0.render("{% if a %}1{% elsif b %}2{% else %}3{% end %}", context).should eq("3")
+    Plombir::Template::EngineV0.render("{% if a %}1{% elsif b %}2{% end %}", context).should eq("")
+  end
+
+  it "limits loop output to the first rows" do
+    rows = [{"title" => "A"}, {"title" => "B"}, {"title" => "C"}]
+    context = {"collections.posts" => rows} of String => Plombir::Template::EngineV0::Value
+    template = "{% for post in collections.posts limit:2 %}{{ post.title }}{% end %}"
+
+    Plombir::Template::EngineV0.render(template, context).should eq("AB")
+  end
+
+  it "offsets loop output past leading rows" do
+    context = {"tags" => ["a", "b", "c"]} of String => Plombir::Template::EngineV0::Value
+    template = "{% for tag in tags offset:1 %}{{ tag }}{% end %}"
+
+    Plombir::Template::EngineV0.render(template, context).should eq("bc")
+  end
+
+  it "combines offset and limit as one window" do
+    context = {"tags" => ["a", "b", "c", "d"]} of String => Plombir::Template::EngineV0::Value
+    template = "{% for tag in tags limit:2 offset:1 %}{{ tag }}{% end %}"
+
+    Plombir::Template::EngineV0.render(template, context).should eq("bc")
+  end
+
+  it "renders nothing when the window is empty" do
+    context = {"tags" => ["a", "b"]} of String => Plombir::Template::EngineV0::Value
+
+    Plombir::Template::EngineV0.render("{% for tag in tags limit:0 %}{{ tag }}{% end %}", context).should eq("")
+    Plombir::Template::EngineV0.render("{% for tag in tags offset:5 %}{{ tag }}{% end %}", context).should eq("")
+  end
+
   it "loops over collection rows with flat field binding" do
     rows = [{"title" => "B", "url" => "/b/"}, {"title" => "A", "url" => "/a/"}]
     context : Plombir::Template::EngineV0::Context = {"collections.posts" => rows} of String => Plombir::Template::EngineV0::Value
