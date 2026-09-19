@@ -2,7 +2,8 @@
 layout: default
 ---
       {{ content }}
+      {% if description %}<p class="tagline">{{ description }}</p>{% end %}
       <ul>
-        {% for post in collections.posts %}<li><a href="{{ post.url }}">{{ post.title }}</a> ({{ post.date }}) — {{ post.excerpt }}</li>
-        {% end %}
+        {% for post in collections.posts limit:10 %}{% component "PostCard" post=post %}{% end %}
       </ul>
+      {% include "footer" %}

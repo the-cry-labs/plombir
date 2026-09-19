@@ -33,21 +33,27 @@ Brand reminder (§34): modern, sharp, minimal, premium developer tool. Subtle pl
 
 ---
 
-## 1. Current state — Phase 1 in progress (`build` works end-to-end)
+## 1. Current state — Phase 4 at its exit gate (`templates` v1 done, pending tag)
 
-Phase 0 is done and tagged (`v0.1.0-foundation`). Phase 1 items 1–7 are
-implemented: `plombir new → plombir build → dist/` works on a zero-config
-site (content discovery, frontmatter with defaults, Markdown subset, routing,
-`{{ content }}` layouts per ADR-003, pipeline, `build` CLI). Remaining for
-the exit gate: item 8 fixtures (`minimal-site`, `empty-frontmatter`) and tag
-`v0.2.0-mvp-slice`.
+Phase 3 is done and tagged (`v0.4.0-content`). Phase 4 items 1–6 are
+implemented: positioned lexer → parser → AST → renderer, errors with
+`file:line:col` plus closest-name hints, `elsif` + `limit:`/`offset:`
+windows, `include` partials, six filters, isolated components, nesting
+guards, `docs/templates.md` with a verified error gallery, syntax
+freeze (ADR-005), and the 1k-render bench (140ms, budget 500ms).
+Remaining for the exit gate: merge the template stack and tag
+`v0.5.0-templates`.
 
-What exists: CLI (`new`, `build`, `--version`, `--help`), Markdown subset
-(ADR-001), frontmatter with defaults (ADR-002), pretty-URL router, engine v0
-+ page composer (ADR-003), build pipeline, 72 green specs, CI (format + spec
-+ release build).
-What is missing: fixture dirs + golden tests, `dev/preview/clean/doctor`,
-collections, templates v1, assets/SEO/feeds, docs site, benchmarks.
+What exists: CLI (`new`, `dev`, `build`, `preview`, `check`, `clean`,
+`doctor`), Markdown subset (ADR-001), frontmatter with defaults
+(ADR-002), pretty-URL router, collections + schemas + permalinks +
+`check` v1, template language v1 (conditionals, loops with
+`limit`/`offset`, includes, six filters, isolated components —
+`docs/templates.md`, ADR-005), `{{ content }}` layouts with chains,
+build pipeline (full + incremental), 318 green specs, CI (format +
+spec + release build).
+What is missing: assets/SEO/feeds (Phase 5), hardening + docs site +
+release binary (Phase 6).
 
 ---
 
@@ -283,11 +289,11 @@ Out of scope: custom user filters/helpers API, async, macros beyond includes, JS
 
 ### 7.3 Acceptance criteria
 
-- [ ] Blog index/loops, conditionals, includes, components, and 2-level layout inheritance render in fixtures.
-- [ ] Every template error test asserts file + line + column + hint; no bare exceptions reach users.
-- [ ] `{{ content }}` never double-escapes HTML; `{{ title }}` always escapes by default.
-- [ ] Component with missing prop fails with prop name + caller file:line.
-- [ ] Template bench: 1k renders of index fixture <500ms (record in benchmarks).
+- [x] Blog index/loops, conditionals, includes, components, and 2-level layout inheritance render in fixtures (`spec/fixtures/blog-site`: `home` conditional tagline + `limit:10` loop via `PostCard` + footer include, `home → default` chain, `expected/index.html` golden).
+- [x] Every template error test asserts file + line + column + hint; no bare exceptions reach users (`spec/template/*`: positions pinned per case; hints via shared `suggest`; `Time::Format::Error` and hand-built-tree paths funnel into `Template::Error`; `docs/templates.md` gallery mechanically verified 20/20 against real output).
+- [x] `{{ content }}` never double-escapes HTML; `{{ title }}` always escapes by default (`spec/template/engine_v0_spec.cr`: raw-content, default-escape, single-escape, raw-`jsonify` cases).
+- [x] Component with missing prop fails with prop name + caller file:line (engine + `spec/renderer/page_spec.cr` disk cases; live `new → build` smoke).
+- [x] Template bench: 1k renders of index fixture <500ms (record in benchmarks) (140ms release on Ryzen 7 8845HS, `docs/benchmarks.md`).
 
 ### 7.4 Exit gate
 
