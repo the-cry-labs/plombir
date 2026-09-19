@@ -59,7 +59,7 @@ describe Plombir::Template::EngineV0 do
   it "refuses to interpolate collections directly" do
     rows = [{"title" => "A", "url" => "/a/"}]
     context : Plombir::Template::EngineV0::Context = {"collections.posts" => rows} of String => Plombir::Template::EngineV0::Value
-    ex = expect_raises(Plombir::Template::EngineV0::Error) do
+    ex = expect_raises(Plombir::Template::Error) do
       Plombir::Template::EngineV0.render("{{ collections.posts }}", context, "layouts/home.html")
     end
 
@@ -75,7 +75,7 @@ describe Plombir::Template::EngineV0 do
   end
 
   it "reports unclosed variables with file and line" do
-    ex = expect_raises(Plombir::Template::EngineV0::Error) do
+    ex = expect_raises(Plombir::Template::Error) do
       Plombir::Template::EngineV0.render("<h1>{{ title</h1>", Plombir::Template::EngineV0::Context.new, "layouts/default.html")
     end
 
@@ -85,10 +85,11 @@ describe Plombir::Template::EngineV0 do
     ex.message.to_s.should contain("✖ Invalid template")
     ex.message.to_s.should contain("layouts/default.html:1")
     ex.message.to_s.should contain("layouts/default.html:1:5")
+    ex.message.to_s.should contain("1 │ <h1>{{ title</h1>")
   end
 
   it "reports unterminated blocks with file and line" do
-    ex = expect_raises(Plombir::Template::EngineV0::Error) do
+    ex = expect_raises(Plombir::Template::Error) do
       Plombir::Template::EngineV0.render("{% if title %}yes", Plombir::Template::EngineV0::Context.new, "page.html")
     end
 
@@ -97,7 +98,7 @@ describe Plombir::Template::EngineV0 do
   end
 
   it "rejects unknown tags and lists valid choices" do
-    ex = expect_raises(Plombir::Template::EngineV0::Error) do
+    ex = expect_raises(Plombir::Template::Error) do
       Plombir::Template::EngineV0.render("{% include \"header\" %}", Plombir::Template::EngineV0::Context.new, "page.html")
     end
 
@@ -106,7 +107,7 @@ describe Plombir::Template::EngineV0 do
   end
 
   it "rejects stray closers" do
-    ex = expect_raises(Plombir::Template::EngineV0::Error) do
+    ex = expect_raises(Plombir::Template::Error) do
       Plombir::Template::EngineV0.render("hello{% end %}", Plombir::Template::EngineV0::Context.new, "page.html")
     end
 
@@ -116,7 +117,7 @@ describe Plombir::Template::EngineV0 do
   end
 
   it "rejects malformed for loops with an example" do
-    ex = expect_raises(Plombir::Template::EngineV0::Error) do
+    ex = expect_raises(Plombir::Template::Error) do
       Plombir::Template::EngineV0.render("{% for tags %}x{% end %}", Plombir::Template::EngineV0::Context.new, "page.html")
     end
 
