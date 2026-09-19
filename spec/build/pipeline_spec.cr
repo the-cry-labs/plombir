@@ -238,6 +238,26 @@ describe Plombir::Build::Pipeline do
     end
   end
 
+  it "injects seo_head and site vars" do
+    with_tempdir do |dir|
+      root = write_site(dir, {
+        "content/index.md"     => "---\ntitle: Home\ndescription: Welcome.\n---\n\n# Home\n\nBody text here.\n",
+        "layouts/default.html" => "<head>{{ seo_head }}</head><body>{{ site.title }}:{{ content }}</body>\n",
+      })
+      site = Plombir::Config::Site.new("Blog", "Blurb", "https://x.example")
+      context = Plombir::Build::Context.new(root, site: site)
+
+      result = Plombir::Build::Pipeline.run(context)
+
+      result.warnings.should be_empty
+      html = File.read(File.join(root, "dist", "index.html"))
+      html.should contain("<title>Home | Blog</title>")
+      html.should contain(%(<meta name="description" content="Welcome.">))
+      html.should contain(%(<link rel="canonical" href="https://x.example/">))
+      html.should contain("Blog:")
+    end
+  end
+
   it "resolves asset_url through the render" do
     with_tempdir do |dir|
       root = write_site(dir, {
@@ -260,6 +280,21 @@ describe Plombir::Build::Pipeline do
       hash = Plombir::Assets::Fingerprint.hash8("body {}\n")
       html.should contain("href=\"/assets/style.#{hash}.css\"")
       missing.should be_empty
+    end
+  end
+
+  it "derives the description from the excerpt without frontmatter" do
+    with_tempdir do |dir|
+      root = write_site(dir, {
+        "content/index.md"     => "# Home\n\nA short paragraph about the homepage.\n",
+        "layouts/default.html" => "<head>{{ seo_head }}</head><body>{{ content }}</body>\n",
+      })
+
+      Plombir::Build::Pipeline.run(Plombir::Build::Context.new(root))
+
+      html = File.read(File.join(root, "dist", "index.html"))
+      html.should contain(%(<meta name="description" content="A short paragraph about the homepage.">))
+      html.should_not contain("canonical")
     end
   end
   describe ".collection_vars" do

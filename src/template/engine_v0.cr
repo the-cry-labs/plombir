@@ -190,8 +190,9 @@ module Plombir
         limit.nil? ? window : window.first(limit)
       end
 
-      # `{{ content }}` (and any `*.content`) is raw HTML; every other
-      # variable is escaped — unless its filter chain already escapes
+      # `{{ content }}` (and any `*.content`) is raw HTML, as is the
+      # pipeline-built `{{ seo_head }}` block; every other variable is
+      # escaped — unless its filter chain already escapes
       # (`| escape`) or emits code (`| jsonify`). Missing variables
       # render as empty strings, filters or not — except inside a
       # component, where interpolating a name that was never passed
@@ -334,7 +335,7 @@ module Plombir
       end
 
       private def self.raw?(name : String) : Bool
-        name == "content" || name.ends_with?(".content")
+        name == "content" || name == "seo_head" || name.ends_with?(".content")
       end
 
       private def self.truthy?(value : Value) : Bool

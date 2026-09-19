@@ -20,15 +20,19 @@ module Plombir
     # Inputs for one build: site *root*, *output* directory (relative
     # to *root* unless absolute), whether *drafts* are included
     # (`plombir build --drafts`), optional per-collection schema rules
-    # (empty means no validation), and optional collection permalink
-    # patterns (empty means conventional URLs). The config loader fills
-    # all three from `plombir.yml`.
+    # (empty means no validation), optional collection permalink
+    # patterns (empty means conventional URLs), the *site* metadata
+    # (`site.*` vars, canonical base, feed identity), and whether
+    # *minify* collapses safe HTML whitespace. The config loader fills
+    # all of these from `plombir.yml`.
     struct Context
       getter root : String
       getter output : String
       getter drafts : Bool
       getter schemas : Hash(String, Content::Schema::CollectionRules)
       getter patterns : Hash(String, String)
+      getter site : Config::Site
+      getter minify : Bool
 
       def initialize(
         @root : String = Dir.current,
@@ -36,6 +40,8 @@ module Plombir
         @drafts : Bool = false,
         @schemas : Hash(String, Content::Schema::CollectionRules) = {} of String => Content::Schema::CollectionRules,
         @patterns : Hash(String, String) = {} of String => String,
+        @site : Config::Site = Config::Site.new,
+        @minify : Bool = false,
       )
       end
 
@@ -229,11 +235,33 @@ module Plombir
         vars["date"] = format_date(entry.document.date(entry.page.mtime))
         vars["tags"] = entry.document.tags
         vars["url"] = route.url
+        vars["site.title"] = context.site.title
+        vars["site.description"] = context.site.description
+        vars["site.url"] = context.site.url
+        vars["seo_head"] = seo_head(entry, route, slug, context.site)
         collections.each { |key, value| vars[key] = value }
         rendered = Renderer::Page.render_file(body, entry.document.layout, context.layouts_dir, vars, entry.page.relative_path, nil, partials, components, assets)
         rewritten = Assets::Rewrite.rewrite(rendered, assets, context.public_dir)
         missing.concat(rewritten.missing)
         rewritten.html
+      end
+
+      # Builds the `{{ seo_head }}` block from frontmatter (title,
+      # description, image), the excerpt fallback, and the site
+      # metadata — the same values as the `site.*` template vars.
+      private def self.seo_head(entry : Entry, route : Router::Route, slug : String, site : Config::Site) : String
+        image = entry.document.string?("image").try(&.strip)
+        image = nil if image.try(&.empty?)
+        Seo::Head.build(
+          title: entry.document.title(slug),
+          description: entry.document.string?("description") || "",
+          excerpt: Content::Document.excerpt(entry.document),
+          image: image,
+          date: entry.document.date(entry.page.mtime),
+          collection: Content::Collection.collection_name(entry.page.relative_path),
+          url: route.url,
+          site: site
+        )
       end
 
       private def self.format_date(date : Time?) : String

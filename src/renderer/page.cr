@@ -37,7 +37,7 @@ module Plombir
         context = Context.new
         vars.each { |key, value| context[key] = value }
         vars.each do |key, value|
-          next if key == "content" || key.includes?(".")
+          next if key == "content" || key == "seo_head" || key.includes?(".")
           context["page.#{key}"] = value
         end
         context["content"] = body_html
