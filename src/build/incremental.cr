@@ -260,17 +260,21 @@ module Plombir
         # Re-discovers and re-renders exactly *targets*, refreshing
         # their graph records (hash, layout, layout index). Returns the
         # per-file breakdown sorted by source for stable log output.
+        # Tiered rebuilds reuse the last manifest from `dist/` so the
+        # helper and rewrite never regress to un-rewritten HTML; only
+        # full builds warn about missing assets (see ADR-006).
         private def render_targets(targets : Array(String), graph : DependencyGraph) : Array(RebuiltFile)
           entries = Pipeline.discover(@context)
           routes = Pipeline.resolve(entries, @context.patterns)
           collections = Pipeline.collection_vars(entries, routes)
+          assets = Assets::Manifest.read(@context.output_dir) || {} of String => String
           files = targets.map do |relative|
             started = Time.instant
             entry = entries.find! { |e| e.page.relative_path == relative }
             route = routes[relative]
             destination = File.join(@context.output_dir, route.output_path)
             Dir.mkdir_p(File.dirname(destination))
-            File.write(destination, Pipeline.render_one(entry, route, @context, collections))
+            File.write(destination, Pipeline.render_one(entry, route, @context, collections, nil, nil, assets, [] of String))
 
             record = graph.pages[relative]
             old_layout = record.layout

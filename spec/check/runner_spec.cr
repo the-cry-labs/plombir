@@ -26,6 +26,20 @@ describe Plombir::Check::Runner do
     end
   end
 
+  it "reports missing fingerprinted assets against the temp build" do
+    with_tempdir do |dir|
+      root = Plombir::Scaffold::Site.new("site", dir).create
+      File.write(File.join(root, "content", "lonely.md"), "---\ntitle: Lonely\ndescription: Lonely page\n---\n\n![ghost](/assets/ghost.png)\n")
+
+      issues = Plombir::Check::Runner.check(root, Plombir::Config.load(root))
+      assets = issues.select { |issue| issue.section == "Assets" }
+
+      assets.size.should eq(1)
+      assets.first.message.should contain(%("/assets/ghost.png"))
+      Dir.exists?(File.join(root, "dist")).should be_false
+    end
+  end
+
   it "skips output sections when sources already fail" do
     with_tempdir do |dir|
       root = Plombir::Scaffold::Site.new("site", dir).create

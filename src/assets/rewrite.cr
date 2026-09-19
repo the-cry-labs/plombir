@@ -37,11 +37,12 @@ module Plombir
       # ```
       def self.rewrite(html : String, manifest : Hash(String, String), public_dir : String) : Result
         missing = [] of String
+        stamped = manifest.values.map { |path| "/" + path }.to_set
         buffer = IO::Memory.new
         last = 0
         html.scan(REF) do |match|
           buffer << html[last...match.begin(0)]
-          mapped, absent = rewrite_url(match[3], manifest, public_dir)
+          mapped, absent = rewrite_url(match[3], manifest, stamped, public_dir)
           missing << absent if absent
           if mapped.nil?
             buffer << match[0]
@@ -89,13 +90,16 @@ module Plombir
 
       # Maps one URL to its fingerprinted form, or reports it missing.
       # Returns `{mapped, absent}`: exactly one side is ever set.
-      private def self.rewrite_url(url : String, manifest : Hash(String, String), public_dir : String) : Tuple(String?, String?)
+      # Already-fingerprinted URLs (e.g. `| asset_url` output) pass
+      # through, keeping the pass idempotent.
+      private def self.rewrite_url(url : String, manifest : Hash(String, String), stamped : Set(String), public_dir : String) : Tuple(String?, String?)
         return {nil, nil} unless url.starts_with?(URL_PREFIX)
         bare, suffix = split_suffix(url[URL_PREFIX.size..])
         return {nil, nil} if bare.empty? || bare.ends_with?("/")
         if mapped = manifest[bare]?
           return {"/" + mapped + suffix, nil}
         end
+        return {nil, nil} if stamped.includes?(URL_PREFIX + bare)
         return {nil, nil} if File.file?(File.join(public_dir, OUTPUT_DIR, bare))
         {nil, URL_PREFIX + bare}
       end

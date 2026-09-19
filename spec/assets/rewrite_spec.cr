@@ -62,6 +62,15 @@ describe Plombir::Assets::Rewrite do
     Plombir::Assets::Rewrite.rewrite(html, manifest, "public").html.should eq(html)
   end
 
+  it "leaves already-fingerprinted urls alone" do
+    html = %(<link href="/assets/style.a1b2c3d4.css">)
+
+    result = Plombir::Assets::Rewrite.rewrite(html, manifest, "public")
+
+    result.html.should eq(html)
+    result.missing.should be_empty
+  end
+
   it "leaves bare directory references alone" do
     result = Plombir::Assets::Rewrite.rewrite(%(<a href="/assets/">x</a>), manifest, "public")
 
