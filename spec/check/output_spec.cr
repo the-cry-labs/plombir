@@ -114,7 +114,7 @@ describe Plombir::Check::SeoCheck do
     with_tempdir do |dir|
       dist = write_check_dist(dir)
 
-      issues = Plombir::Check::SeoCheck.check(dist)
+      issues = Plombir::Check::SeoCheck.check(dist, "https://example.com")
 
       by_file = issues.group_by(&.file)
       by_file["index.html"]?.should be_nil
@@ -122,6 +122,35 @@ describe Plombir::Check::SeoCheck do
       by_file["posts/b/index.html"].size.should eq(2)
       issues.each { |issue| issue.severity.should eq(Plombir::Check::Severity::Warning) }
       issues.each { |issue| issue.section.should eq("SEO") }
+    end
+  end
+
+  it "flags a missing site.url once against plombir.yml" do
+    with_tempdir do |dir|
+      dist = write_check_dist(dir)
+
+      issues = Plombir::Check::SeoCheck.check(dist, "")
+
+      url = issues.select { |issue| issue.file == "plombir.yml" }
+      url.size.should eq(1)
+      url.first.message.should contain("site.url is not set")
+      url.first.severity.should eq(Plombir::Check::Severity::Warning)
+
+      Plombir::Check::SeoCheck.check(dist, "https://example.com").select { |issue| issue.file == "plombir.yml" }.should be_empty
+    end
+  end
+
+  it "warns on titles over 60 characters, warning only" do
+    with_tempdir do |dir|
+      dist = File.join(dir, "dist")
+      Dir.mkdir_p(dist)
+      File.write(File.join(dist, "index.html"), "<html><head><title>#{"x" * 61}</title>\n<meta name=\"description\" content=\"Fine.\"></head><body></body></html>\n")
+
+      issues = Plombir::Check::SeoCheck.check(dist, "https://example.com")
+
+      issues.size.should eq(1)
+      issues.first.message.should contain("61 characters (over 60)")
+      issues.first.severity.should eq(Plombir::Check::Severity::Warning)
     end
   end
 end

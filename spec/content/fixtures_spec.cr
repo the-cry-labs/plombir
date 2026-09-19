@@ -17,7 +17,7 @@ end
 # Builds a fixture root the way the CLI would (own plombir.yml).
 private def build_fixture(root : String) : Plombir::Build::Result
   config = Plombir::Config.load(root)
-  context = Plombir::Build::Context.new(root, config.build.output, false, config.schemas, config.permalink_patterns)
+  context = Plombir::Build::Context.new(root, config.build.output, false, config.schemas, config.permalink_patterns, config.site)
   Plombir::Build::Pipeline.run(context)
 end
 

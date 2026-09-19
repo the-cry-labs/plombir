@@ -4,11 +4,26 @@ describe Plombir::Check::Runner do
   it "passes a healthy site without touching dist/" do
     with_tempdir do |dir|
       root = Plombir::Scaffold::Site.new("site", dir).create
+      File.write(File.join(root, "plombir.yml"), File.read(File.join(root, "plombir.yml")).sub("# url: https://example.com", "url: https://example.com"))
 
       issues = Plombir::Check::Runner.check(root, Plombir::Config.load(root))
 
       issues.should be_empty
       Dir.exists?(File.join(root, "dist")).should be_false
+    end
+  end
+
+  it "flags a missing site.url as the only warning on a fresh site" do
+    with_tempdir do |dir|
+      root = Plombir::Scaffold::Site.new("site", dir).create
+
+      issues = Plombir::Check::Runner.check(root, Plombir::Config.load(root))
+
+      issues.size.should eq(1)
+      issues.first.section.should eq("SEO")
+      issues.first.file.should eq("plombir.yml")
+      issues.first.message.should contain("site.url is not set")
+      issues.none?(&.error?).should be_true
     end
   end
 

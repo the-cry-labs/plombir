@@ -42,7 +42,7 @@ module Plombir
 
         config = Plombir::Config.load_with_warnings(directory, error)
         output = config.build.output
-        context = Plombir::Build::Context.new(directory, output, false, config.schemas, config.permalink_patterns)
+        context = Plombir::Build::Context.new(directory, output, false, config.schemas, config.permalink_patterns, config.site)
         rebuilder = Plombir::Build::Incremental::Rebuilder.new(context)
         result = rebuilder.full
         Build.print_summary(result, io)

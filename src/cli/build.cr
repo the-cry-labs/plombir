@@ -64,7 +64,7 @@ module Plombir
 
         config = Plombir::Config.load_with_warnings(directory, error)
         output = config.build.output unless output_flag
-        context = Plombir::Build::Context.new(directory, output, drafts, config.schemas, config.permalink_patterns)
+        context = Plombir::Build::Context.new(directory, output, drafts, config.schemas, config.permalink_patterns, config.site)
         result = Plombir::Build::Pipeline.run(context)
         if strict && !result.warnings.empty?
           error.puts "✖ Asset warnings (--strict)"

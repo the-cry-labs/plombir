@@ -39,7 +39,7 @@ private def assert_golden(name : String) : Nil
       FileUtils.cp_r(File.join(fixture, entry), File.join(root, entry))
     end
     config = Plombir::Config.load(root)
-    context = Plombir::Build::Context.new(root, config.build.output, false, config.schemas, config.permalink_patterns)
+    context = Plombir::Build::Context.new(root, config.build.output, false, config.schemas, config.permalink_patterns, config.site)
     Plombir::Build::Pipeline.run(context)
 
     expected = File.join(fixture, "expected")

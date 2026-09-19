@@ -19,6 +19,7 @@ describe Plombir::CLI::Check do
   it "passes a healthy site" do
     with_tempdir do |dir|
       root = Plombir::Scaffold::Site.new("site", dir).create
+      with_site_url(root)
       io = IO::Memory.new
 
       code = Plombir::CLI::Check.call([] of String, root, io, IO::Memory.new)
@@ -33,6 +34,7 @@ describe Plombir::CLI::Check do
   it "fails errors with or without --strict" do
     with_tempdir do |dir|
       root = Plombir::Scaffold::Site.new("site", dir).create
+      with_site_url(root)
       File.write(File.join(root, "content", "lonely.md"), "---\ntitle: Lonely\ndescription: Lonely page\n---\n\n[Nowhere](/nowhere/)\n")
       io = IO::Memory.new
 
@@ -47,6 +49,7 @@ describe Plombir::CLI::Check do
   it "fails warnings only with --strict" do
     with_tempdir do |dir|
       root = Plombir::Scaffold::Site.new("site", dir).create
+      with_site_url(root)
       File.write(File.join(root, "content", "empty.md"), "---\ntitle: Empty\ndescription: Empty page\n---\n")
       lenient = IO::Memory.new
       strict = IO::Memory.new
@@ -58,4 +61,12 @@ describe Plombir::CLI::Check do
       strict.to_s.should contain("1 warning.")
     end
   end
+end
+
+# Points a scaffolded site at an example URL so specs about other
+# behavior don't trip the missing-site.url SEO warning (covered in
+# `spec/check/runner_spec.cr` instead).
+private def with_site_url(root : String) : Nil
+  config = File.join(root, "plombir.yml")
+  File.write(config, File.read(config).sub("# url: https://example.com", "url: https://example.com"))
 end
