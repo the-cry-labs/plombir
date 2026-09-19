@@ -4,12 +4,10 @@
 # It supports variables with dotted lookup and `| filter` chains, the
 # raw `{{ content }}` slot, `{% if %}`/`{% elsif %}`/`{% else %}`
 # conditionals, `{% for %}` loops with `limit:N`/`offset:N`,
-# `{% include %}` partials, and `{# comments #}` (see
-# `docs/adr/003-layout-slot.md`). Everything else raises a
-# `Template::Error` with a `file:line:col` diagnostic plus source line.
-#
-# Components land in the next Phase 4 slice behind the same call
-# shape; callers only use `render`.
+# `{% include %}` partials, isolated `{% component %}` calls, and
+# `{# comments #}` (see `docs/adr/003-layout-slot.md`). Everything
+# else raises a `Template::Error` with a `file:line:col` diagnostic
+# plus source line.
 module Plombir
   module Template
     module EngineV0
@@ -27,9 +25,13 @@ module Plombir
       # The engine never touches the disk — partials are data.
       alias Partials = Hash(String, String)
 
-      # Guards cyclic includes (`a` → `b` → `a` → …). Chains this
-      # deep are always a cycle; the diagnostic names the whole chain.
-      MAX_INCLUDE_DEPTH = 10
+      # Component sources for `{% component %}`: basename → template
+      # source. Built from `components/` the same way as `Partials`.
+      alias Components = Hash(String, String)
+
+      # Guards cyclic partials (`a` → `B` → `a` → …). Chains this deep
+      # are always a cycle; the diagnostic names the whole chain.
+      MAX_NESTING_DEPTH = 10
 
       # Renders *template* with *context* (usually built by
       # `Plombir::Renderer::Page`). Structure problems raise
@@ -38,7 +40,7 @@ module Plombir
       # ```
       # EngineV0.render("<h1>{{ title }}</h1>", {"title" => "Hi"}) # => "<h1>Hi</h1>"
       # ```
-      def self.render(template : String, context : Context, file : String = "<input>", includes : Partials = Partials.new) : String
+      def self.render(template : String, context : Context, file : String = "<input>", includes : Partials = Partials.new, components : Components = Components.new) : String
         lines = template.split('\n')
         tokens = begin
           Lexer.tokenize(template)
@@ -47,14 +49,17 @@ module Plombir
         end
         # Structure failures raise `Error` out of the parser, so the
         # renderer below only sees a valid tree.
-        render_nodes(Parser.parse(tokens, file, lines), context, Context.new, file, lines, includes, [] of String)
+        render_nodes(Parser.parse(tokens, file, lines), context, Context.new, file, lines, includes, components, [] of String, nil)
       end
 
       # Renders a node list. `scope` holds loop bindings shadowing
       # `context` for the current block; *lines* feeds diagnostics;
-      # *stack* names the open includes, oldest first, for the cycle
-      # guard.
-      private def self.render_nodes(nodes : Array(AST::Node), context : Context, scope : Context, file : String, lines : Array(String), includes : Partials, stack : Array(String)) : String
+      # *stack* names the open includes and components, oldest first,
+      # for the cycle guard. *call_site* is set inside a component to
+      # `{name, tag_position}`: interpolating names the component was
+      # never given then fails loudly, while conditions stay lenient
+      # so optional props keep working.
+      private def self.render_nodes(nodes : Array(AST::Node), context : Context, scope : Context, file : String, lines : Array(String), includes : Partials, components : Components, stack : Array(String), call_site : Tuple(String, String)?) : String
         out = IO::Memory.new
 
         nodes.each do |node|
@@ -62,14 +67,14 @@ module Plombir
           when AST::Text
             out << node.value
           when AST::Variable
-            out << resolve(node.name, node.filters, context, scope, file, lines, node.line, node.column)
+            out << resolve(node.name, node.filters, context, scope, file, lines, node.line, node.column, call_site)
           when AST::If
             if truthy?(lookup(node.condition, context, scope))
-              out << render_nodes(node.body, context, scope, file, lines, includes, stack)
+              out << render_nodes(node.body, context, scope, file, lines, includes, components, stack, call_site)
             elsif branch = node.elsifs.find { |candidate| truthy?(lookup(candidate.condition, context, scope)) }
-              out << render_nodes(branch.body, context, scope, file, lines, includes, stack)
+              out << render_nodes(branch.body, context, scope, file, lines, includes, components, stack, call_site)
             else
-              out << render_nodes(node.else_body, context, scope, file, lines, includes, stack)
+              out << render_nodes(node.else_body, context, scope, file, lines, includes, components, stack, call_site)
             end
           when AST::For
             collection = lookup(node.collection, context, scope)
@@ -77,17 +82,19 @@ module Plombir
               windowed(list, node.limit, node.offset).each do |element|
                 child = scope.dup
                 child[node.item] = element
-                out << render_nodes(node.body, context, child, file, lines, includes, stack)
+                out << render_nodes(node.body, context, child, file, lines, includes, components, stack, call_site)
               end
             elsif rows = collection.as?(Array(Hash(String, String)))
               windowed(rows, node.limit, node.offset).each do |row|
                 child = scope.dup
                 row.each { |key, val| child["#{node.item}.#{key}"] = val }
-                out << render_nodes(node.body, context, child, file, lines, includes, stack)
+                out << render_nodes(node.body, context, child, file, lines, includes, components, stack, call_site)
               end
             end
           when AST::Include
-            out << render_include(node, context, scope, file, lines, includes, stack)
+            out << render_include(node, context, scope, file, lines, includes, components, stack, call_site)
+          when AST::Component
+            out << render_component(node, context, scope, file, lines, includes, components, stack)
           end
         end
 
@@ -102,14 +109,14 @@ module Plombir
       # scope, so loop variables stay visible inside it; failures
       # inside the partial are attributed to `(include "name")` on the
       # caller's file, with the partial's own source line appended.
-      private def self.render_include(node : AST::Include, context : Context, scope : Context, file : String, lines : Array(String), includes : Partials, stack : Array(String)) : String
+      private def self.render_include(node : AST::Include, context : Context, scope : Context, file : String, lines : Array(String), includes : Partials, components : Components, stack : Array(String), call_site : Tuple(String, String)?) : String
         source = includes[node.name]?
         if source.nil?
           Errors.fail(file, lines, node.line, node.column, Errors.include_message(file, node.line, node.column, node.name, includes.keys.sort))
         end
         chain = stack + [node.name]
-        if chain.size > MAX_INCLUDE_DEPTH
-          Errors.fail(file, lines, node.line, node.column, Errors.include_depth_message(file, node.line, node.column, chain, MAX_INCLUDE_DEPTH))
+        if chain.size > MAX_NESTING_DEPTH
+          Errors.fail(file, lines, node.line, node.column, Errors.include_depth_message(file, node.line, node.column, chain, MAX_NESTING_DEPTH))
         end
         origin = "#{file} (include #{node.name.inspect})"
         partial_lines = source.split('\n')
@@ -118,7 +125,58 @@ module Plombir
         rescue ex : Lexer::Error
           Errors.fail(origin, partial_lines, ex.line, ex.column, Errors.unclosed_message(origin, ex.line, ex.column, ex.opener))
         end
-        render_nodes(Parser.parse(tokens, origin, partial_lines), context, scope, origin, partial_lines, includes, chain)
+        render_nodes(Parser.parse(tokens, origin, partial_lines), context, scope, origin, partial_lines, includes, components, chain, call_site)
+      end
+
+      # Renders one `{% component %}` call in an isolated scope: the
+      # body sees exactly its props (plus loop bindings it creates
+      # itself). Interpolating anything else fails with the prop name
+      # and the call site; conditions stay lenient so `{% if %}` can
+      # guard optional props.
+      private def self.render_component(node : AST::Component, context : Context, scope : Context, file : String, lines : Array(String), includes : Partials, components : Components, stack : Array(String)) : String
+        source = components[node.name]?
+        if source.nil?
+          Errors.fail(file, lines, node.line, node.column, Errors.component_message(file, node.line, node.column, node.name, components.keys.sort))
+        end
+        chain = stack + [node.name]
+        if chain.size > MAX_NESTING_DEPTH
+          Errors.fail(file, lines, node.line, node.column, Errors.include_depth_message(file, node.line, node.column, chain, MAX_NESTING_DEPTH))
+        end
+        origin = "#{file} (component #{node.name.inspect})"
+        call_site = {node.name, "#{file}:#{node.line}:#{node.column}"}
+        partial_lines = source.split('\n')
+        tokens = begin
+          Lexer.tokenize(source)
+        rescue ex : Lexer::Error
+          Errors.fail(origin, partial_lines, ex.line, ex.column, Errors.unclosed_message(origin, ex.line, ex.column, ex.opener))
+        end
+        render_nodes(Parser.parse(tokens, origin, partial_lines), Context.new, bind_props(node, context, scope), origin, partial_lines, includes, components, chain, call_site)
+      end
+
+      # Binds a component's isolated scope from the caller's view
+      # (loop scope shadowing context): quoted values bind verbatim,
+      # lookups forward flat — `post=post` copies `post` plus every
+      # `post.*` key so rows travel whole, `item=post` renames them.
+      # Explicitly passed `nil` stays bound (renders `""`); only names
+      # never passed at all trip the strict check in `resolve`.
+      private def self.bind_props(node : AST::Component, context : Context, scope : Context) : Context
+        view = context.merge(scope)
+        props = Context.new
+        node.props.each do |prop|
+          if prop.literal
+            props[prop.key] = prop.value
+            next
+          end
+          forwarded = false
+          view.each do |key, val|
+            if key == prop.value || key.starts_with?("#{prop.value}.")
+              props[prop.key + key[prop.value.size..]] = val
+              forwarded = true
+            end
+          end
+          props[prop.key] = lookup(prop.value, context, scope) unless forwarded
+        end
+        props
       end
 
       # Applies a loop's `offset`/`limit` window. `nil` limit renders
@@ -132,9 +190,16 @@ module Plombir
       # `{{ content }}` (and any `*.content`) is raw HTML; every other
       # variable is escaped — unless its filter chain already escapes
       # (`| escape`) or emits code (`| jsonify`). Missing variables
-      # render as empty strings, filters or not.
-      private def self.resolve(name : String, filters : Array(AST::Filter), context : Context, scope : Context, file : String, lines : Array(String), line : Int32, column : Int32) : String
+      # render as empty strings, filters or not — except inside a
+      # component, where interpolating a name that was never passed
+      # fails with the prop name and the call site.
+      private def self.resolve(name : String, filters : Array(AST::Filter), context : Context, scope : Context, file : String, lines : Array(String), line : Int32, column : Int32, call_site : Tuple(String, String)?) : String
         value = lookup(name, context, scope)
+        if value.nil? && !bound?(name, context, scope)
+          if site = call_site
+            Errors.fail(file, lines, line, column, Errors.prop_message(file, line, column, site[0], name, site[1]))
+          end
+        end
         if value.is_a?(Array(Hash(String, String)))
           Errors.fail(file, lines, line, column, Errors.collection_message(file, line, column, name))
         end
@@ -145,6 +210,10 @@ module Plombir
           value = text
         end
         raw?(name) || filters.any? { |filter| filter.name == "escape" || filter.name == "jsonify" } ? text : escape(text)
+      end
+
+      private def self.bound?(name : String, context : Context, scope : Context) : Bool
+        scope.has_key?(name) || context.has_key?(name)
       end
 
       # Renders one lookup without filters: `nil` and missing names

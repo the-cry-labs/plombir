@@ -130,6 +130,43 @@ describe Plombir::Template::Parser do
     end
   end
 
+  it "parses components with lookup and literal props" do
+    nodes = parse("{% component \"PostCard\" post=post title=\"Hi\" %}")
+
+    nodes.size.should eq(1)
+    call = nodes[0].as(Plombir::Template::AST::Component)
+    call.name.should eq("PostCard")
+    call.line.should eq(1)
+    call.column.should eq(1)
+    call.props.map(&.key).should eq(["post", "title"])
+    call.props[0].literal.should be_false
+    call.props[0].value.should eq("post")
+    call.props[1].literal.should be_true
+    call.props[1].value.should eq("Hi")
+  end
+
+  it "parses components without props" do
+    call = parse("{% component \"Nav\" %}")[0].as(Plombir::Template::AST::Component)
+
+    call.name.should eq("Nav")
+    call.props.should be_empty
+  end
+
+  it "keeps spaces inside quoted prop values" do
+    call = parse("{% component \"C\" title=\"Hello World\" %}")[0].as(Plombir::Template::AST::Component)
+
+    call.props.size.should eq(1)
+    call.props[0].value.should eq("Hello World")
+  end
+
+  it "rejects malformed component tags" do
+    ["{% component %}", "{% component PostCard %}", "{% component \"../x\" post=post %}", "{% component \"C\" title %}", "{% component \"C\" =x %}", "{% component \"C\" title= %}", "{% component \"C\" a=1 a=2 %}"].each do |source|
+      ex = parse_error(source)
+
+      ex.message.to_s.should contain("Expected `{% component \"Name\" key=value %}`")
+    end
+  end
+
   it "rejects unknown tags" do
     ex = parse_error("{% embed \"header\" %}")
 

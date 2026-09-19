@@ -27,7 +27,7 @@ module Plombir
       # Names the engine understands in `{% %}`. Shared by the
       # unknown-tag diagnostic and its closest-name hint so the two
       # can never drift apart.
-      TAG_NAMES = ["if", "elsif", "for", "include", "else", "end"]
+      TAG_NAMES = ["if", "elsif", "for", "include", "component", "else", "end"]
 
       # Filters the engine applies in `{{ }}`. Shared by the
       # unknown-filter diagnostic and its hint, like `TAG_NAMES`.
@@ -190,12 +190,57 @@ module Plombir
 
       def self.include_depth_message(file : String, line : Int32, column : Int32, chain : Array(String), max : Int32) : String
         String.build do |io|
-          io << "✖ Includes nested too deep\n\n"
+          io << "✖ Partials nested too deep\n\n"
           io << loc(file, line, column) << "\n\n"
-          io << "#{chain.last.inspect} exceeds the include limit (max #{max}):\n\n"
+          io << "#{chain.last.inspect} exceeds the nesting limit (max #{max}):\n\n"
           io << "  " << chain.join(" → ") << "\n\n"
-          io << "Partials cannot include each other in a cycle. Remove the circular include."
+          io << "Includes and components cannot reference each other in a cycle. Remove the circular reference."
         end
+      end
+
+      def self.component_syntax_message(file : String, line : Int32, column : Int32) : String
+        String.build do |io|
+          io << "✖ Invalid template\n\n"
+          io << loc(file, line, column) << "\n\n"
+          io << "Expected `{% component \"Name\" key=value %}` with a quoted name and `key=value` props.\n\n"
+          io << "Example:\n{% component \"PostCard\" post=post %}\n"
+        end
+      end
+
+      def self.component_message(file : String, line : Int32, column : Int32, name : String, available : Array(String)) : String
+        String.build do |io|
+          io << "✖ Unknown component\n\n"
+          io << loc(file, line, column) << "\n\n"
+          io << "Unknown component: #{name.inspect}\n\n"
+          if hint = suggest(name, available)
+            io << hint
+          end
+          if available.empty?
+            io << "No components found. Add one under components/ (e.g. components/PostCard.html).\n"
+          else
+            io << "Available components:\n"
+            available.each do |candidate|
+              io << "  " << candidate << "\n"
+            end
+          end
+        end
+      end
+
+      def self.prop_message(file : String, line : Int32, column : Int32, component : String, name : String, call_site : String) : String
+        String.build do |io|
+          io << "✖ Unknown prop\n\n"
+          io << loc(file, line, column) << "\n\n"
+          io << "#{name.inspect} is not available in component #{component.inspect}.\n\n"
+          io << "Pass it at the call site (#{call_site}):\n"
+          io << "{% component #{component.inspect} #{prop_example(name)} %}\n"
+        end
+      end
+
+      # Suggests the `key=value` spelling for a missing name:
+      # `author` → `author=author`, `post.title` → `post=post`.
+      private def self.prop_example(name : String) : String
+        head = name.split(".")[0]
+        "#{head}=#{head}"
       end
 
       def self.stray_message(file : String, line : Int32, column : Int32, tag : String) : String
