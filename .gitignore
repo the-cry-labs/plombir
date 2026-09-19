@@ -6,3 +6,6 @@
 # Generated site output and local build cache.
 /dist/
 /.plombir/
+
+# Local OpenCode / agent config.
+.opencode/
