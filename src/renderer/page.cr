@@ -1,15 +1,24 @@
 # Plombir::Renderer::Page composes rendered Markdown with a layout.
 #
 # Layouts stay plain HTML with `{{ var }}` holes plus a `{{ content }}` slot
-# (see `docs/adr/003-layout-slot.md`): no inheritance, no helpers, no logic
-# beyond what `Plombir::Template::EngineV0` offers. `{{ title }}` and friends
-# are escaped; `{{ content }}` is the already-rendered page HTML verbatim.
+# (see `docs/adr/003-layout-slot.md`): no inheritance syntax, no helpers, no
+# logic beyond what `Plombir::Template::EngineV0` offers. `{{ title }}` and
+# friends are escaped; `{{ content }}` is the already-rendered page HTML
+# verbatim.
+#
+# Layouts chain through frontmatter: a layout whose source starts with a
+# `---` block naming a `layout:` parent renders inside that parent, up to
+# `MAX_CHAIN_DEPTH`. A layout without a parent ends the chain.
 module Plombir
   module Renderer
     # Composes one page: Markdown HTML plus a layout source.
     module Page
       alias Value = Template::EngineV0::Value
       alias Context = Template::EngineV0::Context
+
+      # Maximum layout nesting (`post` inside `default` inside …).
+      # Chains this deep are always a cycle — see `LayoutChainTooDeep`.
+      MAX_CHAIN_DEPTH = 10
 
       # Renders *body_html* inside *layout_source*.
       #
@@ -33,7 +42,10 @@ module Plombir
       end
 
       # Loads `layouts/<layout_name>.html` from *layouts_dir* and renders it.
-      # Raises `LayoutNotFound` listing `available_layouts` when absent.
+      # A layout with a frontmatter `layout:` parent renders inside that
+      # parent first (its `{{ content }}` receives this layout's output),
+      # up to `MAX_CHAIN_DEPTH`. Raises `LayoutNotFound` listing
+      # `available_layouts` when a link in the chain is absent.
       #
       # ```
       # Page.render_file("<p>Hi.</p>", "post", "layouts", {"title" => "Hi"}, "content/a.md")
@@ -46,11 +58,33 @@ module Plombir
         file : String = "<input>",
         line : Int32? = nil,
       ) : String
+        render_chain(body_html, layout_name, layouts_dir, vars, file, line, [layout_name])
+      end
+
+      # Renders one chain link: *body_html* inside *layout_name*, then
+      # into its parent, if any. *chain* names the links so far, oldest
+      # first, for the depth-guard diagnostic.
+      private def self.render_chain(
+        body_html : String,
+        layout_name : String,
+        layouts_dir : String,
+        vars : Context,
+        file : String,
+        line : Int32?,
+        chain : Array(String),
+      ) : String
+        if chain.size > MAX_CHAIN_DEPTH
+          raise LayoutChainTooDeep.new(file, chain)
+        end
         path = File.join(layouts_dir, "#{layout_name}.html")
         unless File.file?(path)
           raise LayoutNotFound.new(file, line, layout_name, available_layouts(layouts_dir))
         end
-        render(body_html, File.read(path), vars, file)
+        document = Frontmatter.parse(File.read(path), path)
+        inner = render(body_html, document.body, vars, file)
+        parent = document.string?("layout").try(&.strip) || ""
+        return inner if parent.empty?
+        render_chain(inner, parent, layouts_dir, vars, file, line, chain + [parent])
       end
 
       # Returns sorted layout names (`default`, `post`, …) for *layouts_dir*.
@@ -61,6 +95,28 @@ module Plombir
       def self.available_layouts(layouts_dir : String) : Array(String)
         return [] of String unless Dir.exists?(layouts_dir)
         Dir.glob(File.join(layouts_dir, "*.html")).map { |path| File.basename(path, ".html") }.sort
+      end
+    end
+
+    # Raised when layout parents nest deeper than
+    # `Page::MAX_CHAIN_DEPTH`. Chains this deep are always a cycle
+    # (`post` → `post` → …); the message names the whole chain.
+    class LayoutChainTooDeep < Exception
+      getter file : String
+      getter chain : Array(String)
+
+      def initialize(@file : String, @chain : Array(String))
+        super(build_message)
+      end
+
+      private def build_message : String
+        String.build do |io|
+          io << "✖ Could not render page\n\n"
+          io << @file << "\n\n"
+          io << "Layout chain too deep (max #{Page::MAX_CHAIN_DEPTH}):\n\n"
+          io << "  " << @chain.join(" → ") << "\n\n"
+          io << "Layouts nest through frontmatter `layout:` keys. Break the cycle so every chain ends at a layout without a parent."
+        end
       end
     end
 
