@@ -64,10 +64,10 @@ module Plombir
       resolved
     end
 
-    # Turns `My Post!` into `my-post`. Used for filename-derived slugs.
+    # Turns `My Post!` into `my-post`. Delegates to `Utils` so
+    # routing and the `| slugify` filter share one definition.
     def self.slugify(text : String) : String
-      slug = text.downcase.gsub(/[^a-z0-9]+/, "-").strip("-")
-      slug.empty? ? "page" : slug
+      Utils.slugify(text)
     end
 
     # Expands a collection permalink pattern (`/blog/:year/:slug/`)

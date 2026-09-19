@@ -1,15 +1,15 @@
 # Plombir::Template::EngineV0 is the minimal layout renderer for the MVP slice.
 #
 # Pipeline: `Lexer.tokenize` → `Parser.parse` → render the `AST`.
-# It supports variables with dotted lookup, the raw `{{ content }}`
-# slot, `{% if %}`/`{% elsif %}`/`{% else %}` conditionals,
-# `{% for %}` loops with `limit:N`/`offset:N`, `{% include %}`
-# partials, and `{# comments #}` (see `docs/adr/003-layout-slot.md`).
-# Everything else raises a `Template::Error` with a `file:line:col`
-# diagnostic plus source line.
+# It supports variables with dotted lookup and `| filter` chains, the
+# raw `{{ content }}` slot, `{% if %}`/`{% elsif %}`/`{% else %}`
+# conditionals, `{% for %}` loops with `limit:N`/`offset:N`,
+# `{% include %}` partials, and `{# comments #}` (see
+# `docs/adr/003-layout-slot.md`). Everything else raises a
+# `Template::Error` with a `file:line:col` diagnostic plus source line.
 #
-# Full syntax (filters, components) lands in later Phase 4 slices
-# behind the same call shape; callers only use `render`.
+# Components land in the next Phase 4 slice behind the same call
+# shape; callers only use `render`.
 module Plombir
   module Template
     module EngineV0
@@ -62,7 +62,7 @@ module Plombir
           when AST::Text
             out << node.value
           when AST::Variable
-            out << resolve(node.name, context, scope, file, lines, node.line, node.column)
+            out << resolve(node.name, node.filters, context, scope, file, lines, node.line, node.column)
           when AST::If
             if truthy?(lookup(node.condition, context, scope))
               out << render_nodes(node.body, context, scope, file, lines, includes, stack)
@@ -130,18 +130,134 @@ module Plombir
       end
 
       # `{{ content }}` (and any `*.content`) is raw HTML; every other
-      # variable is escaped. Missing variables render as empty strings.
-      private def self.resolve(name : String, context : Context, scope : Context, file : String, lines : Array(String), line : Int32, column : Int32) : String
+      # variable is escaped — unless its filter chain already escapes
+      # (`| escape`) or emits code (`| jsonify`). Missing variables
+      # render as empty strings, filters or not.
+      private def self.resolve(name : String, filters : Array(AST::Filter), context : Context, scope : Context, file : String, lines : Array(String), line : Int32, column : Int32) : String
         value = lookup(name, context, scope)
+        if value.is_a?(Array(Hash(String, String)))
+          Errors.fail(file, lines, line, column, Errors.collection_message(file, line, column, name))
+        end
+        return scalar(name, value) if filters.empty?
+        text = scalar_string(value)
+        filters.each do |filter|
+          text = apply_filter(filter, filter.name == "jsonify" ? value : text, file, lines, line, column)
+          value = text
+        end
+        raw?(name) || filters.any? { |filter| filter.name == "escape" || filter.name == "jsonify" } ? text : escape(text)
+      end
+
+      # Renders one lookup without filters: `nil` and missing names
+      # become `""`, booleans print bare, lists join with `", "`.
+      private def self.scalar(name : String, value : Value) : String
         return "" if value.nil?
         return value ? "true" : "false" if value.is_a?(Bool)
         if value.is_a?(Array(String))
           return value.map { |entry| escape(entry) }.join(", ")
         end
-        if value.is_a?(Array(Hash(String, String)))
-          Errors.fail(file, lines, line, column, Errors.collection_message(file, line, column, name))
+        raw?(name) ? value.as(String) : escape(value.as(String))
+      end
+
+      # The unescaped display string of one lookup: filter-chain input.
+      private def self.scalar_string(value : Value) : String
+        return "" if value.nil?
+        return value ? "true" : "false" if value.is_a?(Bool)
+        return value.join(", ") if value.is_a?(Array(String))
+        value.as(String)
+      end
+
+      # Applies one `| filter` step. Unknown names never reach here —
+      # the parser validates membership — so the `else` only guards
+      # hand-built trees from raising bare exceptions.
+      private def self.apply_filter(filter : AST::Filter, value : Value, file : String, lines : Array(String), line : Int32, column : Int32) : String
+        case filter.name
+        when "escape"     then escape(scalar_string(value))
+        when "strip_html" then strip_html(scalar_string(value))
+        when "truncate"   then truncate_text(scalar_string(value), truncate_length(filter, file, lines, line, column))
+        when "date"       then format_stamp(scalar_string(value), filter.arg, file, lines, line, column)
+        when "slugify"    then Utils.slugify(scalar_string(value))
+        when "jsonify"    then value.to_json
+        else
+          Errors.fail(file, lines, line, column, Errors.filter_message(file, line, column, filter.name))
         end
-        raw?(name) ? value : escape(value)
+      end
+
+      # Strips `<...>` tags, keeping text. Tag-soup rules: a `<` eats
+      # through the next `>` outside quotes (the common `strip_html`
+      # behavior), while a `<` with no later `>` stays literal.
+      # Inputs are renderer-produced excerpts, not hostile HTML.
+      private def self.strip_html(text : String) : String
+        out = IO::Memory.new
+        i = 0
+        while i < text.size
+          if text[i] == '<' && (close = tag_end(text, i))
+            i = close + 1
+          else
+            out << text[i]
+            i += 1
+          end
+        end
+        out.to_s
+      end
+
+      # Finds the `>` closing the tag at *open*. Returns nil for
+      # unterminated `<` (rendered literally by the caller).
+      private def self.tag_end(text : String, open : Int32) : Int32?
+        i = open + 1
+        quote : Char? = nil
+        while i < text.size
+          char = text[i]
+          if quote
+            quote = nil if char == quote
+          elsif char == '"' || char == '\''
+            quote = char
+          elsif char == '>'
+            return i
+          end
+          i += 1
+        end
+        nil
+      end
+
+      # Keeps the first *length* characters, appending `...` when
+      # anything was cut. Character-based, so multibyte text survives.
+      private def self.truncate_text(text : String, length : Int32) : String
+        chars = text.chars
+        chars.size > length ? chars.first(length).join + "..." : text
+      end
+
+      # Reads a `| truncate: N` count. The parser validates literals,
+      # so this only fires for hand-built trees — still a diagnostic,
+      # never a bare `Nil` assertion.
+      private def self.truncate_length(filter : AST::Filter, file : String, lines : Array(String), line : Int32, column : Int32) : Int32
+        length = filter.arg.try(&.to_i?(whitespace: false))
+        if length.nil? || length < 0
+          Errors.fail(file, lines, line, column, Errors.filter_arg_message(file, line, column, filter.name))
+        end
+        length
+      end
+
+      # Formats an ISO (`YYYY-MM-DD`, the pipeline's `date` shape) or
+      # RFC 3339 date through Crystal `Time` patterns
+      # (`{{ post.date | date: "%B %-d, %Y" }}`). Unparseable input is
+      # an author-facing error, never a silent passthrough.
+      private def self.format_stamp(text : String, format : String?, file : String, lines : Array(String), line : Int32, column : Int32) : String
+        stamp = parse_stamp(text.strip)
+        if stamp.nil?
+          Errors.fail(file, lines, line, column, Errors.date_message(file, line, column, text))
+        end
+        pattern = format.nil? || format.empty? ? "%Y-%m-%d" : format
+        stamp.to_s(pattern)
+      end
+
+      private def self.parse_stamp(text : String) : Time?
+        Time.parse(text, "%Y-%m-%d", Time::Location::UTC)
+      rescue Time::Format::Error | ArgumentError
+        begin
+          Time::Format::RFC_3339.parse(text)
+        rescue Time::Format::Error | ArgumentError
+          nil
+        end
       end
 
       private def self.raw?(name : String) : Bool

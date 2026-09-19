@@ -47,6 +47,11 @@ describe Plombir::Template::Errors do
     Plombir::Template::Errors.closest("incldue", Plombir::Template::Errors::TAG_NAMES).should eq("include")
   end
 
+  it "finds the closest filter name" do
+    Plombir::Template::Errors.closest("truncatee", Plombir::Template::Errors::FILTER_NAMES).should eq("truncate")
+    Plombir::Template::Errors.closest("slugifi", Plombir::Template::Errors::FILTER_NAMES).should eq("slugify")
+  end
+
   it "returns nil when nothing is near enough" do
     Plombir::Template::Errors.closest("xyz", Plombir::Template::Errors::TAG_NAMES).should be_nil
   end

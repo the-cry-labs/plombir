@@ -29,12 +29,30 @@ module Plombir
         end
       end
 
-      # `{{ dotted.name }}`. Names stay flat strings — contexts are
-      # flat maps, so `post.title` is one key, not a traversal.
+      # `{{ dotted.name | filter | other: arg }}`. Names stay flat
+      # strings — contexts are flat maps, so `post.title` is one key,
+      # not a traversal. Filters apply left to right (see `Filter`).
       class Variable < Node
         getter name : String
+        getter filters : Array(Filter)
 
-        def initialize(@name : String, line : Int32, column : Int32)
+        def initialize(@name : String, @filters : Array(Filter), line : Int32, column : Int32)
+          super(line, column)
+        end
+
+        def filtered? : Bool
+          !@filters.empty?
+        end
+      end
+
+      # One `| name` or `| name: arg` step in a `{{ var }}` tag.
+      # *arg* is the literal text after `:` (unquoted when quoted),
+      # validated per filter by the parser.
+      class Filter < Node
+        getter name : String
+        getter arg : String?
+
+        def initialize(@name : String, @arg : String?, line : Int32, column : Int32)
           super(line, column)
         end
       end

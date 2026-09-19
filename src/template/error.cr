@@ -29,6 +29,10 @@ module Plombir
       # can never drift apart.
       TAG_NAMES = ["if", "elsif", "for", "include", "else", "end"]
 
+      # Filters the engine applies in `{{ }}`. Shared by the
+      # unknown-filter diagnostic and its hint, like `TAG_NAMES`.
+      FILTER_NAMES = ["escape", "strip_html", "truncate", "date", "slugify", "jsonify"]
+
       # Raises an `Error` for *file* at *line*:*column*, appending the
       # offending source line from *lines* (the template split on
       # `\n`) to *body*.
@@ -59,6 +63,45 @@ module Plombir
           io << loc(file, line, column) << "\n\n"
           io << "Expected a variable name between `{{` and `}}`.\n\n"
           io << "Example:\n{{ title }}\n"
+        end
+      end
+
+      def self.filter_message(file : String, line : Int32, column : Int32, name : String, available : Array(String) = FILTER_NAMES) : String
+        String.build do |io|
+          io << "✖ Invalid template\n\n"
+          io << loc(file, line, column) << "\n\n"
+          io << "Unknown filter: #{name.inspect}\n\n"
+          if hint = suggest(name, available)
+            io << hint
+          end
+          io << "Available filters:\n"
+          available.each do |candidate|
+            io << "  " << candidate << "\n"
+          end
+        end
+      end
+
+      def self.filter_arg_message(file : String, line : Int32, column : Int32, name : String) : String
+        String.build do |io|
+          io << "✖ Invalid template\n\n"
+          io << loc(file, line, column) << "\n\n"
+          if name == "truncate"
+            io << "The `| truncate` filter needs a character count.\n\n"
+            io << "Example:\n{{ excerpt | truncate: 160 }}\n"
+          else
+            io << "The `| " << name << "` filter takes no argument.\n\n"
+            io << "Example:\n{{ title | " << name << " }}\n"
+          end
+        end
+      end
+
+      def self.date_message(file : String, line : Int32, column : Int32, value : String) : String
+        String.build do |io|
+          io << "✖ Invalid date\n\n"
+          io << loc(file, line, column) << "\n\n"
+          io << "Cannot format #{value.inspect} as a date.\n\n"
+          io << "Expected `YYYY-MM-DD` or RFC 3339 (the shapes frontmatter `date:` accepts).\n\n"
+          io << "Example:\n{{ post.date | date: \"%Y-%m-%d\" }}\n"
         end
       end
 
