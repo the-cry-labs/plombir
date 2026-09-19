@@ -3,6 +3,8 @@
 # Philosophy: Write. Build. Ship.
 # Licensed under the Mozilla Public License 2.0 (MPL-2.0).
 require "yaml"
+require "json"
+require "./utils/slug"
 require "./content/loader"
 require "./content/document"
 require "./content/collection"

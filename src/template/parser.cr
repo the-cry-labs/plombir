@@ -1,11 +1,12 @@
 # Plombir::Template::Parser turns a `Lexer` token stream into `AST`
 # nodes (roadmap Phase 4, item 1).
 #
-# Recursive descent over the v0 surface: text, dotted-name variables,
-# `{% if %}`/`{% elsif %}`/`{% else %}`/`{% end %}`,
-# `{% for %}` (with `limit:N`/`offset:N`)/`{% end %}`. Structure
-# failures raise `Template::Error` via `Errors` (one shared diagnostic
-# format with the source line appended).
+# Recursive descent over the v0 surface: text, dotted-name variables
+# with `| filter` chains, `{% if %}`/`{% elsif %}`/`{% else %}`/
+# `{% end %}`, `{% for %}` (with `limit:N`/`offset:N`)/`{% end %}`,
+# `{% include %}`. Structure failures raise `Template::Error` via
+# `Errors` (one shared diagnostic format with the source line
+# appended).
 module Plombir
   module Template
     module Parser
@@ -81,11 +82,14 @@ module Plombir
             return AST::Text.new(token.value, token.line, token.column)
           end
           if token.variable?
-            unless Parser.name?(token.value)
+            segments = split_filters(token.value)
+            name = segments[0].strip
+            unless Parser.name?(name)
               fail(token.line, token.column, Errors.variable_message(@file, token.line, token.column))
             end
+            filters = segments[1..].map { |segment| parse_filter(segment, token) }
             @pos += 1
-            return AST::Variable.new(token.value, token.line, token.column)
+            return AST::Variable.new(name, filters, token.line, token.column)
           end
           parse_tag(token)
         end
@@ -155,6 +159,43 @@ module Plombir
           AST::Include.new(name, opening.line, opening.column)
         end
 
+        # Parses one `| name` / `| name: arg` filter step. Unknown
+        # names fail with the available list plus a closest-name hint;
+        # literal args are validated per filter (`truncate` needs a
+        # count, value filters take none, `date` takes any format).
+        private def parse_filter(segment : String, token : Lexer::Token) : AST::Filter
+          name, _, raw = segment.partition(":")
+          name = name.strip
+          unless Errors::FILTER_NAMES.includes?(name)
+            fail(token.line, token.column, Errors.filter_message(@file, token.line, token.column, name, Errors::FILTER_NAMES))
+          end
+          bare = raw.strip
+          arg = bare.empty? ? nil : literal(bare)
+          validate_filter_arg(name, arg, token)
+          AST::Filter.new(name, arg, token.line, token.column)
+        end
+
+        # Checks a filter's literal argument: `truncate` requires a
+        # non-negative count, value filters (`escape`, `strip_html`,
+        # `slugify`, `jsonify`) take none, `date` accepts any format.
+        private def validate_filter_arg(name : String, arg : String?, token : Lexer::Token) : Nil
+          case name
+          when "truncate"
+            unless !arg.nil? && arg.matches?(/\A\d+\z/) && !arg.to_i?(whitespace: false).nil?
+              fail(token.line, token.column, Errors.filter_arg_message(@file, token.line, token.column, name))
+            end
+          when "escape", "strip_html", "slugify", "jsonify"
+            unless arg.nil?
+              fail(token.line, token.column, Errors.filter_arg_message(@file, token.line, token.column, name))
+            end
+          end
+        end
+
+        # Strips matching quotes from a filter argument, if present.
+        private def literal(text : String) : String
+          unquoted(text) || text
+        end
+
         # Strips one pair of matching single or double quotes. Returns
         # nil for unquoted or mismatched text — include names are
         # always quoted so partial references stay greppable.
@@ -164,6 +205,31 @@ module Plombir
           return nil unless opener == '"' || opener == '\''
           return nil unless text[-1] == opener
           text[1...-1]
+        end
+
+        # Splits a `{{ }}` body on `|` separators outside quotes, so
+        # `truncate: "a|b"` keeps its pipe. The first matching quote
+        # closes — quotes never escape or nest in filter arguments.
+        private def split_filters(body : String) : Array(String)
+          parts = [] of String
+          current = IO::Memory.new
+          quote : Char? = nil
+          body.each_char do |char|
+            if quote
+              current << char
+              quote = nil if char == quote
+            elsif char == '"' || char == '\''
+              quote = char
+              current << char
+            elsif char == '|'
+              parts << current.to_s
+              current = IO::Memory.new
+            else
+              current << char
+            end
+          end
+          parts << current.to_s
+          parts
         end
 
         private def parse_for(opening : Lexer::Token) : AST::For

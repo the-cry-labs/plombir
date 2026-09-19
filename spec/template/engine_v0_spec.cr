@@ -149,6 +149,93 @@ describe Plombir::Template::EngineV0 do
     %w[if elsif for include else end].each { |tag| ex.message.to_s.should contain(tag) }
   end
 
+  it "chains the excerpt pipeline" do
+    context = {"excerpt" => "<p>Hello <b>world</b>, this is long.</p>"} of String => Plombir::Template::EngineV0::Value
+
+    Plombir::Template::EngineV0.render("{{ excerpt | strip_html | truncate: 16 }}", context).should eq("Hello world, thi...")
+  end
+
+  it "escapes filtered output by default" do
+    context = {"title" => "a<bcd"} of String => Plombir::Template::EngineV0::Value
+
+    Plombir::Template::EngineV0.render("{{ title | truncate: 5 }}", context).should eq("a&lt;bcd")
+  end
+
+  it "never double-escapes explicit escape" do
+    context = {"title" => "a&b"} of String => Plombir::Template::EngineV0::Value
+
+    Plombir::Template::EngineV0.render("{{ title | escape }}", context).should eq("a&amp;b")
+  end
+
+  it "leaves jsonify raw" do
+    title = {"title" => "a\"b"} of String => Plombir::Template::EngineV0::Value
+    tags = {"tags" => ["a", "b"]} of String => Plombir::Template::EngineV0::Value
+
+    Plombir::Template::EngineV0.render("{{ title | jsonify }}", title).should eq("\"a\\\"b\"")
+    Plombir::Template::EngineV0.render("{{ tags | jsonify }}", tags).should eq("[\"a\",\"b\"]")
+  end
+
+  it "keeps content raw through filters" do
+    context = {"content" => "<p>a&b</p>"} of String => Plombir::Template::EngineV0::Value
+
+    Plombir::Template::EngineV0.render("{{ content | strip_html }}", context).should eq("a&b")
+  end
+
+  it "slugifies titles" do
+    context = {"title" => "Hello, World!"} of String => Plombir::Template::EngineV0::Value
+
+    Plombir::Template::EngineV0.render("{{ title | slugify }}", context).should eq("hello-world")
+  end
+
+  it "strips tags but keeps trailing bare brackets literal" do
+    context = {"x" => "a < b"} of String => Plombir::Template::EngineV0::Value
+
+    Plombir::Template::EngineV0.render("{{ x | strip_html }}", context).should eq("a &lt; b")
+  end
+
+  it "formats dates with default and custom patterns" do
+    context = {"post.date" => "2026-09-13"} of String => Plombir::Template::EngineV0::Value
+
+    Plombir::Template::EngineV0.render("{{ post.date | date }}", context).should eq("2026-09-13")
+    Plombir::Template::EngineV0.render("{{ post.date | date: \"%Y/%m\" }}", context).should eq("2026/09")
+  end
+
+  it "formats RFC 3339 dates" do
+    context = {"post.date" => "2026-09-13T10:00:00Z"} of String => Plombir::Template::EngineV0::Value
+
+    Plombir::Template::EngineV0.render("{{ post.date | date }}", context).should eq("2026-09-13")
+  end
+
+  it "rejects unparseable dates with file and line" do
+    context = {"post.date" => "yesterday"} of String => Plombir::Template::EngineV0::Value
+
+    ex = expect_raises(Plombir::Template::Error) do
+      Plombir::Template::EngineV0.render("{{ post.date | date }}", context, "page.html")
+    end
+
+    ex.message.to_s.should contain("✖ Invalid date")
+    ex.message.to_s.should contain("page.html:1")
+    ex.message.to_s.should contain("\"yesterday\"")
+  end
+
+  it "renders missing variables with filters as empty" do
+    Plombir::Template::EngineV0.render(
+      "{{ missing | truncate: 5 }}",
+      Plombir::Template::EngineV0::Context.new
+    ).should eq("")
+  end
+
+  it "still refuses collections with filters" do
+    rows = [{"title" => "A"}]
+    context = {"collections.posts" => rows} of String => Plombir::Template::EngineV0::Value
+
+    ex = expect_raises(Plombir::Template::Error) do
+      Plombir::Template::EngineV0.render("{{ collections.posts | jsonify }}", context, "page.html")
+    end
+
+    ex.message.to_s.should contain("Cannot interpolate a collection")
+  end
+
   it "renders includes from the partial map" do
     context = {"title" => "Hi"} of String => Plombir::Template::EngineV0::Value
     includes = {"header" => "<header>{{ title }}</header>"}

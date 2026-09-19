@@ -151,8 +151,78 @@ describe Plombir::Template::Parser do
     ex.message.to_s.should_not contain("Did you mean")
   end
 
-  it "rejects bad variable names" do
+  it "parses filter chains with args" do
+    nodes = parse("{{ excerpt | strip_html | truncate: 160 }}")
+
+    var = nodes[0].as(Plombir::Template::AST::Variable)
+    var.name.should eq("excerpt")
+    var.filtered?.should be_true
+    var.filters.map(&.name).should eq(["strip_html", "truncate"])
+    var.filters[0].arg.should be_nil
+    var.filters[1].arg.should eq("160")
+  end
+
+  it "parses unfiltered variables with no filters" do
+    var = parse("{{ title }}")[0].as(Plombir::Template::AST::Variable)
+
+    var.filtered?.should be_false
+  end
+
+  it "unquotes filter args" do
+    double = parse("{{ post.date | date: \"%Y\" }}")[0].as(Plombir::Template::AST::Variable)
+    single = parse("{{ post.date | date: '%Y' }}")[0].as(Plombir::Template::AST::Variable)
+
+    double.filters[0].arg.should eq("%Y")
+    single.filters[0].arg.should eq("%Y")
+  end
+
+  it "keeps pipes inside quoted args" do
+    var = parse("{{ post.date | date: \"a|b\" }}")[0].as(Plombir::Template::AST::Variable)
+
+    var.filters.size.should eq(1)
+    var.filters[0].arg.should eq("a|b")
+  end
+
+  it "rejects unknown filters with available names" do
     ex = parse_error("{{ title | upcase }}")
+
+    ex.message.to_s.should contain("Unknown filter")
+    ex.message.to_s.should contain("\"upcase\"")
+    ex.message.to_s.should contain("Available filters")
+    ex.message.to_s.should contain("strip_html")
+  end
+
+  it "suggests the closest filter" do
+    ex = parse_error("{{ title | truncatee }}")
+
+    ex.message.to_s.should contain("Did you mean `truncate`?")
+  end
+
+  it "rejects empty filter steps" do
+    empty = parse_error("{{ title | }}")
+
+    empty.message.to_s.should contain("Unknown filter")
+    missing = parse_error("{{ | escape }}")
+
+    missing.message.to_s.should contain("Expected a variable name")
+  end
+
+  it "rejects bad truncate args" do
+    ["{{ x | truncate }}", "{{ x | truncate: }}", "{{ x | truncate: xyz }}", "{{ x | truncate: -1 }}", "{{ x | truncate: 1.5 }}", "{{ x | truncate: 99999999999999999999 }}"].each do |source|
+      ex = parse_error(source)
+
+      ex.message.to_s.should contain("needs a character count")
+    end
+  end
+
+  it "rejects args on value filters" do
+    ex = parse_error("{{ x | escape: y }}")
+
+    ex.message.to_s.should contain("takes no argument")
+  end
+
+  it "rejects bad variable names" do
+    ex = parse_error("{{ title name }}")
 
     ex.message.to_s.should contain("Expected a variable name")
   end
