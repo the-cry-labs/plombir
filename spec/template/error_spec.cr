@@ -32,4 +32,25 @@ describe Plombir::Template::Errors do
     ex.column.should eq(2)
     ex.message.to_s.should eq("detail\n\n\n1 │ abc")
   end
+
+  it "measures edit distance" do
+    Plombir::Template::Errors.distance("kitten", "sitting").should eq(3)
+    Plombir::Template::Errors.distance("same", "same").should eq(0)
+    Plombir::Template::Errors.distance("", "abc").should eq(3)
+    Plombir::Template::Errors.distance("abc", "").should eq(3)
+  end
+
+  it "finds the closest name" do
+    Plombir::Template::Errors.closest("endfor", Plombir::Template::Errors::TAG_NAMES).should eq("end")
+    Plombir::Template::Errors.closest("iff", Plombir::Template::Errors::TAG_NAMES).should eq("if")
+  end
+
+  it "returns nil when nothing is near enough" do
+    Plombir::Template::Errors.closest("xyz", Plombir::Template::Errors::TAG_NAMES).should be_nil
+  end
+
+  it "formats the hint line" do
+    Plombir::Template::Errors.suggest("endfor", Plombir::Template::Errors::TAG_NAMES).should eq("Did you mean `end`?\n\n")
+    Plombir::Template::Errors.suggest("xyz", Plombir::Template::Errors::TAG_NAMES).should be_nil
+  end
 end

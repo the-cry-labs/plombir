@@ -24,6 +24,11 @@ module Plombir
     # Builds `Error` diagnostics. Bodies stay stable — specs pin their
     # wording — while `fail` appends the source-line footer.
     module Errors
+      # Names the engine understands in `{% %}`. Shared by the
+      # unknown-tag diagnostic and its closest-name hint so the two
+      # can never drift apart.
+      TAG_NAMES = ["if", "for", "else", "end"]
+
       # Raises an `Error` for *file* at *line*:*column*, appending the
       # offending source line from *lines* (the template split on
       # `\n`) to *body*.
@@ -107,7 +112,13 @@ module Plombir
           io << "✖ Invalid template\n\n"
           io << loc(file, line, column) << "\n\n"
           io << "Unknown tag: #{tag.inspect}\n\n"
-          io << "Available tags:\n  if\n  for\n  else\n  end\n"
+          if hint = suggest(tag, TAG_NAMES)
+            io << hint
+          end
+          io << "Available tags:\n"
+          TAG_NAMES.each do |name|
+            io << "  " << name << "\n"
+          end
         end
       end
 
@@ -122,6 +133,65 @@ module Plombir
 
       private def self.loc(file : String, line : Int32, column : Int32) : String
         "#{file}:#{line}:#{column}"
+      end
+
+      # Edit distance between two words (insert, delete, and
+      # substitute cost 1). Hand-rolled two-row table: tag and filter
+      # names are a few chars, so this is plenty and dependency-free.
+      def self.distance(a : String, b : String) : Int32
+        previous = (0..b.size).to_a
+        current = Array(Int32).new(b.size + 1, 0)
+        a.each_char.with_index(1) do |char_a, i|
+          current[0] = i
+          b.each_char.with_index(1) do |char_b, j|
+            cost = char_a == char_b ? 0 : 1
+            current[j] = {previous[j] + 1, current[j - 1] + 1, previous[j - 1] + cost}.min
+          end
+          previous, current = current, previous
+        end
+        previous[b.size]
+      end
+
+      # The nearest candidate to *word*, or nil when nothing is near
+      # enough: at most 3 edits and strictly fewer than the word's
+      # length, so `xyz` never suggests `end`. Ties prefer the
+      # longest shared prefix — typos usually keep the start of the
+      # word, so `endfor` suggests `end`, not `for`.
+      def self.closest(word : String, candidates : Array(String)) : String?
+        best : String? = nil
+        best_distance = Int32::MAX
+        best_prefix = -1
+        candidates.each do |candidate|
+          d = distance(word, candidate)
+          prefix = common_prefix(word, candidate)
+          if d < best_distance || (d == best_distance && prefix > best_prefix)
+            best_distance = d
+            best_prefix = prefix
+            best = candidate
+          end
+        end
+        best if best && best_distance <= 3 && best_distance < word.size
+      end
+
+      # A ready-to-print hint line for the nearest candidate, or nil.
+      # Generic over *candidates* so the future unknown-filter
+      # diagnostic reuses it unchanged.
+      def self.suggest(word : String, candidates : Array(String)) : String?
+        if match = closest(word, candidates)
+          "Did you mean `#{match}`?\n\n"
+        end
+      end
+
+      # Shared leading characters of two words, e.g. `common_prefix("endfor", "end") == 3`.
+      private def self.common_prefix(a : String, b : String) : Int32
+        chars_a = a.chars
+        chars_b = b.chars
+        count = 0
+        chars_a.each_with_index do |char_a, i|
+          break if i >= chars_b.size || chars_b[i] != char_a
+          count += 1
+        end
+        count
       end
     end
   end
