@@ -45,6 +45,7 @@ describe Plombir::Template::Errors do
     Plombir::Template::Errors.closest("iff", Plombir::Template::Errors::TAG_NAMES).should eq("if")
     Plombir::Template::Errors.closest("elsfi", Plombir::Template::Errors::TAG_NAMES).should eq("elsif")
     Plombir::Template::Errors.closest("incldue", Plombir::Template::Errors::TAG_NAMES).should eq("include")
+    Plombir::Template::Errors.closest("compnent", Plombir::Template::Errors::TAG_NAMES).should eq("component")
   end
 
   it "finds the closest filter name" do

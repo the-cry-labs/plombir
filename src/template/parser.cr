@@ -42,9 +42,10 @@ module Plombir
         text == "elsif" || text.starts_with?("elsif ")
       end
 
-      # A partial name for `{% include %}`: flat basenames only
-      # (`header`, `post-card`). No slashes or dots — partials live
-      # beside the layouts that use them, so `..` can never escape.
+      # A partial or component name: flat basenames only (`header`,
+      # `post-card`, `PostCard`). No slashes or dots — partials live
+      # beside the layouts that use them, components under
+      # `components/`, so `..` can never escape either directory.
       def self.partial_name?(text : String) : Bool
         text.matches?(/\A[A-Za-z0-9_-]+\z/)
       end
@@ -99,6 +100,7 @@ module Plombir
           return parse_if(token) if tag == "if" || tag.starts_with?("if ")
           return parse_for(token) if tag == "for" || tag.starts_with?("for ")
           return parse_include(token) if tag == "include" || tag.starts_with?("include ")
+          return parse_component(token) if tag == "component" || tag.starts_with?("component ")
           if tag == "else" || tag == "end" || Parser.elsif_tag?(tag)
             fail(token.line, token.column, Errors.stray_message(@file, token.line, token.column, tag))
           else
@@ -157,6 +159,56 @@ module Plombir
           end
           @pos += 1
           AST::Include.new(name, opening.line, opening.column)
+        end
+
+        # Parses `{% component "Name" key=value key="lit" %}`. The name
+        # is one quoted basename; every prop is `key=value` with a
+        # bare key, each key at most once. Quoted values bind
+        # literally, bare values are caller-side dotted lookups.
+        private def parse_component(opening : Lexer::Token) : AST::Component
+          rest = opening.value.lchop("component").strip
+          name, tail = quoted_head(rest)
+          if name.nil? || !Parser.partial_name?(name)
+            fail(opening.line, opening.column, Errors.component_syntax_message(@file, opening.line, opening.column))
+          end
+          props = split_props(tail).map { |part| parse_prop(part, opening) }
+          seen = [] of String
+          props.each do |prop|
+            if seen.includes?(prop.key)
+              fail(opening.line, opening.column, Errors.component_syntax_message(@file, opening.line, opening.column))
+            end
+            seen << prop.key
+          end
+          @pos += 1
+          AST::Component.new(name, props, opening.line, opening.column)
+        end
+
+        # Splits off one leading `"quoted"` or `'quoted'` head,
+        # returning the inner text plus the remainder. Returns nil
+        # when the head is not a clean quoted word.
+        private def quoted_head(rest : String) : Tuple(String?, String)
+          return {nil, rest} if rest.size < 2
+          opener = rest[0]
+          return {nil, rest} unless opener == '"' || opener == '\''
+          close = rest.index(opener, 1)
+          return {nil, rest} if close.nil?
+          {rest[1...close], rest[(close + 1)..].strip}
+        end
+
+        private def parse_prop(part : String, opening : Lexer::Token) : AST::Prop
+          key, sep, value = part.partition("=")
+          key = key.strip
+          if sep.empty? || !Parser.plain_name?(key) || value.strip.empty?
+            fail(opening.line, opening.column, Errors.component_syntax_message(@file, opening.line, opening.column))
+          end
+          bare = value.strip
+          if literal = unquoted(bare)
+            AST::Prop.new(key, literal, true)
+          elsif Parser.name?(bare)
+            AST::Prop.new(key, bare, false)
+          else
+            fail(opening.line, opening.column, Errors.component_syntax_message(@file, opening.line, opening.column))
+          end
         end
 
         # Parses one `| name` / `| name: arg` filter step. Unknown
@@ -229,6 +281,33 @@ module Plombir
             end
           end
           parts << current.to_s
+          parts
+        end
+
+        # Splits component props on whitespace outside quotes, so
+        # `title="Hello World"` stays one prop. Runs of whitespace
+        # collapse; the first matching quote closes.
+        private def split_props(tail : String) : Array(String)
+          parts = [] of String
+          current = IO::Memory.new
+          quote : Char? = nil
+          tail.each_char do |char|
+            if quote
+              current << char
+              quote = nil if char == quote
+            elsif char == '"' || char == '\''
+              quote = char
+              current << char
+            elsif char.whitespace?
+              unless current.empty?
+                parts << current.to_s
+                current = IO::Memory.new
+              end
+            else
+              current << char
+            end
+          end
+          parts << current.to_s unless current.empty?
           parts
         end
 

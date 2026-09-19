@@ -2,7 +2,8 @@
 #
 # Layouts stay plain HTML with `{{ var }}` holes plus a `{{ content }}` slot
 # (see `docs/adr/003-layout-slot.md`), `{% include %}` partials resolved
-# from `layouts/` beside them, and no logic beyond what
+# from `layouts/` beside them, isolated `{% component %}` calls resolved
+# from `components/`, and no logic beyond what
 # `Plombir::Template::EngineV0` offers. `{{ title }}` and friends are
 # escaped; `{{ content }}` is the already-rendered page HTML verbatim.
 #
@@ -16,6 +17,7 @@ module Plombir
       alias Value = Template::EngineV0::Value
       alias Context = Template::EngineV0::Context
       alias Partials = Template::EngineV0::Partials
+      alias Components = Template::EngineV0::Components
 
       # Maximum layout nesting (`post` inside `default` inside …).
       # Chains this deep are always a cycle — see `LayoutChainTooDeep`.
@@ -30,7 +32,7 @@ module Plombir
       # ```
       # Page.render("<p>Hi.</p>", "<h1>{{ title }}</h1>{{ content }}", {"title" => "Hi"})
       # ```
-      def self.render(body_html : String, layout_source : String, vars : Context, file : String = "<input>", includes : Partials = Partials.new) : String
+      def self.render(body_html : String, layout_source : String, vars : Context, file : String = "<input>", includes : Partials = Partials.new, components : Components = Components.new) : String
         context = Context.new
         vars.each { |key, value| context[key] = value }
         vars.each do |key, value|
@@ -39,7 +41,7 @@ module Plombir
         end
         context["content"] = body_html
         context["page.content"] = body_html
-        Template::EngineV0.render(layout_source, context, file, includes)
+        Template::EngineV0.render(layout_source, context, file, includes, components)
       end
 
       # Loads `layouts/<layout_name>.html` from *layouts_dir* and renders it.
@@ -59,8 +61,19 @@ module Plombir
         file : String = "<input>",
         line : Int32? = nil,
         partials : Partials? = nil,
+        components : Components? = nil,
       ) : String
-        render_chain(body_html, layout_name, layouts_dir, partials || partial_sources(layouts_dir), vars, file, line, [layout_name])
+        render_chain(
+          body_html,
+          layout_name,
+          layouts_dir,
+          partials || partial_sources(layouts_dir),
+          components || component_sources(File.join(File.dirname(layouts_dir), "components")),
+          vars,
+          file,
+          line,
+          [layout_name]
+        )
       end
 
       # Loads every `layouts/*.html` body as an includable partial
@@ -81,6 +94,23 @@ module Plombir
         partials
       end
 
+      # Loads every `components/*.html` body as a component source
+      # (basename → body without frontmatter), mirroring
+      # `partial_sources`. Callers rendering many pages build this
+      # once and pass it to `render_file`.
+      #
+      # ```
+      # Page.component_sources("components") # => {"PostCard" => "<article>…"}
+      # ```
+      def self.component_sources(components_dir : String) : Components
+        sources = Components.new
+        return sources unless Dir.exists?(components_dir)
+        Dir.glob(File.join(components_dir, "*.html")).each do |path|
+          sources[File.basename(path, ".html")] = Frontmatter.parse(File.read(path), path).body
+        end
+        sources
+      end
+
       # Renders one chain link: *body_html* inside *layout_name*, then
       # into its parent, if any. *chain* names the links so far, oldest
       # first, for the depth-guard diagnostic.
@@ -89,6 +119,7 @@ module Plombir
         layout_name : String,
         layouts_dir : String,
         includes : Partials,
+        components : Components,
         vars : Context,
         file : String,
         line : Int32?,
@@ -102,10 +133,10 @@ module Plombir
           raise LayoutNotFound.new(file, line, layout_name, available_layouts(layouts_dir))
         end
         document = Frontmatter.parse(File.read(path), path)
-        inner = render(body_html, document.body, vars, file, includes)
+        inner = render(body_html, document.body, vars, file, includes, components)
         parent = document.string?("layout").try(&.strip) || ""
         return inner if parent.empty?
-        render_chain(inner, parent, layouts_dir, includes, vars, file, line, chain + [parent])
+        render_chain(inner, parent, layouts_dir, includes, components, vars, file, line, chain + [parent])
       end
 
       # Returns sorted layout names (`default`, `post`, …) for *layouts_dir*.

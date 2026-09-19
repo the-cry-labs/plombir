@@ -37,6 +37,62 @@ describe Plombir::Renderer::Page do
     end
   end
 
+  it "renders components from the sibling components directory" do
+    with_tempdir do |dir|
+      layouts = File.join(dir, "layouts")
+      components = File.join(dir, "components")
+      Dir.mkdir_p(layouts)
+      Dir.mkdir_p(components)
+      File.write(File.join(components, "PostCard.html"), "<article><h2>{{ post.title }}</h2></article>")
+      File.write(File.join(layouts, "home.html"), "{% for post in collections.posts %}{% component \"PostCard\" post=post %}{% end %}")
+
+      vars = Plombir::Renderer::Page::Context.new
+      vars["collections.posts"] = [{"title" => "A", "url" => "/a/"}]
+      Plombir::Renderer::Page.render_file("<p>Hi.</p>", "home", layouts, vars, "content/index.md").should eq(
+        "<article><h2>A</h2></article>"
+      )
+    end
+  end
+
+  it "lists available components for missing names" do
+    with_tempdir do |dir|
+      layouts = File.join(dir, "layouts")
+      components = File.join(dir, "components")
+      Dir.mkdir_p(layouts)
+      Dir.mkdir_p(components)
+      File.write(File.join(components, "PostCard.html"), "x")
+      File.write(File.join(layouts, "home.html"), "{% component \"Nav\" %}")
+
+      ex = expect_raises(Plombir::Template::Error) do
+        Plombir::Renderer::Page.render_file("body", "home", layouts, Plombir::Renderer::Page::Context.new, "content/index.md")
+      end
+
+      ex.message.to_s.should contain("✖ Unknown component")
+      ex.message.to_s.should contain("\"Nav\"")
+      ex.message.to_s.should contain("PostCard")
+    end
+  end
+
+  it "reports missing props with the layout call site" do
+    with_tempdir do |dir|
+      layouts = File.join(dir, "layouts")
+      components = File.join(dir, "components")
+      Dir.mkdir_p(layouts)
+      Dir.mkdir_p(components)
+      File.write(File.join(components, "PostCard.html"), "<h2>{{ post.title }}</h2><p>{{ author }}</p>")
+      File.write(File.join(layouts, "home.html"), "<main>\n{% component \"PostCard\" post=post %}\n</main>")
+
+      vars = Plombir::Renderer::Page::Context.new
+      vars["post.title"] = "A"
+      ex = expect_raises(Plombir::Template::Error) do
+        Plombir::Renderer::Page.render_file("body", "home", layouts, vars, "content/index.md")
+      end
+
+      ex.message.to_s.should contain("\"author\"")
+      ex.message.to_s.should contain("content/index.md:2:")
+    end
+  end
+
   it "inlines layout partials from disk" do
     with_tempdir do |dir|
       layouts = File.join(dir, "layouts")

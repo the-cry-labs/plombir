@@ -4,9 +4,9 @@
 # The parser builds these nodes from `Lexer` tokens; every node keeps
 # the 1-based line and column where its opening delimiter sits, so
 # render-time failures point at the author's source. The tree covers
-# text, dotted-name variables, `if`/`elsif`/`else`, `for` with
-# `limit`/`offset`, and `include` — and grows with later slices
-# (filters, components).
+# the v1 surface — text, filtered variables, `if`/`elsif`/`else`,
+# `for` with `limit`/`offset`, `include`, and isolated `component`
+# calls with explicit props.
 module Plombir
   module Template
     module AST
@@ -110,6 +110,31 @@ module Plombir
 
         def initialize(@name : String, line : Int32, column : Int32)
           super(line, column)
+        end
+      end
+
+      # `{% component "PostCard" post=post title="Hi" %}`. *name* is
+      # the component's basename under `components/`; *props* bind in
+      # the component's isolated scope (nothing else is visible).
+      class Component < Node
+        getter name : String
+        getter props : Array(Prop)
+
+        def initialize(@name : String, @props : Array(Prop), line : Int32, column : Int32)
+          super(line, column)
+        end
+      end
+
+      # One `key=value` component prop. Quoted values bind literally
+      # (`title="Hi"`); bare values are caller-side lookups
+      # (`post=post`, which forwards `post` plus every `post.*` key so
+      # rows travel whole, or `item=post` to rename them to `item.*`).
+      struct Prop
+        getter key : String
+        getter value : String
+        getter literal : Bool
+
+        def initialize(@key : String, @value : String, @literal : Bool)
         end
       end
     end

@@ -146,7 +146,7 @@ describe Plombir::Template::EngineV0 do
     end
 
     ex.message.to_s.should contain("Unknown tag")
-    %w[if elsif for include else end].each { |tag| ex.message.to_s.should contain(tag) }
+    %w[if elsif for include component else end].each { |tag| ex.message.to_s.should contain(tag) }
   end
 
   it "chains the excerpt pipeline" do
@@ -234,6 +234,130 @@ describe Plombir::Template::EngineV0 do
     end
 
     ex.message.to_s.should contain("Cannot interpolate a collection")
+  end
+
+  it "renders components with lookup and literal props" do
+    context = {"title" => "Outer"} of String => Plombir::Template::EngineV0::Value
+    components = {"Badge" => "<b>{{ label }}:{{ title }}</b>"}
+
+    Plombir::Template::EngineV0.render(
+      "{% component \"Badge\" label=\"Hi\" title=title %}",
+      context, "page.html",
+      Plombir::Template::EngineV0::Partials.new, components
+    ).should eq("<b>Hi:Outer</b>")
+  end
+
+  it "forwards rows whole through prefix props" do
+    rows = [{"title" => "A", "url" => "/a/"}, {"title" => "B", "url" => "/b/"}]
+    context = {"collections.posts" => rows} of String => Plombir::Template::EngineV0::Value
+    components = {"Card" => "<a href=\"{{ post.url }}\">{{ post.title }}</a>"}
+    template = "{% for post in collections.posts %}{% component \"Card\" post=post %}{% end %}"
+
+    Plombir::Template::EngineV0.render(
+      template, context, "page.html",
+      Plombir::Template::EngineV0::Partials.new, components
+    ).should eq("<a href=\"/a/\">A</a><a href=\"/b/\">B</a>")
+  end
+
+  it "renames forwarded rows through the prop key" do
+    rows = [{"title" => "A"}]
+    context = {"collections.posts" => rows} of String => Plombir::Template::EngineV0::Value
+    components = {"Card" => "{{ item.title }}"}
+    template = "{% for post in collections.posts %}{% component \"Card\" item=post %}{% end %}"
+
+    Plombir::Template::EngineV0.render(
+      template, context, "page.html",
+      Plombir::Template::EngineV0::Partials.new, components
+    ).should eq("A")
+  end
+
+  it "isolates components from outer scope" do
+    context = {"title" => "Outer"} of String => Plombir::Template::EngineV0::Value
+    components = {"Leaky" => "{{ title }}"}
+
+    ex = expect_raises(Plombir::Template::Error) do
+      Plombir::Template::EngineV0.render(
+        "{% component \"Leaky\" %}", context, "page.html",
+        Plombir::Template::EngineV0::Partials.new, components
+      )
+    end
+
+    ex.message.to_s.should contain("✖ Unknown prop")
+    ex.message.to_s.should contain("\"title\"")
+    ex.message.to_s.should contain("page.html:1:1")
+    ex.message.to_s.should contain("(component \"Leaky\")")
+  end
+
+  it "names the missing prop with its call site" do
+    components = {"PostCard" => "<article>{{ post.title }} by {{ author }}</article>"}
+    rows = [{"title" => "A"}]
+    context = {"collections.posts" => rows} of String => Plombir::Template::EngineV0::Value
+    template = "x\n{% for post in collections.posts %}{% component \"PostCard\" post=post %}{% end %}"
+
+    ex = expect_raises(Plombir::Template::Error) do
+      Plombir::Template::EngineV0.render(
+        template, context, "page.html",
+        Plombir::Template::EngineV0::Partials.new, components
+      )
+    end
+
+    ex.message.to_s.should contain("\"author\"")
+    ex.message.to_s.should contain("component \"PostCard\"")
+    ex.message.to_s.should contain("page.html:2:")
+    ex.message.to_s.should contain("{% component \"PostCard\" author=author %}")
+  end
+
+  it "lets conditions guard optional props" do
+    components = {"Maybe" => "[{% if subtitle %}<em>{{ subtitle }}</em>{% end %} rest]"}
+
+    Plombir::Template::EngineV0.render(
+      "{% component \"Maybe\" %}",
+      Plombir::Template::EngineV0::Context.new, "page.html",
+      Plombir::Template::EngineV0::Partials.new, components
+    ).should eq("[ rest]")
+  end
+
+  it "fails missing components with available names" do
+    components = {"PostCard" => "x"}
+
+    ex = expect_raises(Plombir::Template::Error) do
+      Plombir::Template::EngineV0.render(
+        "{% component \"Nav\" %}", Plombir::Template::EngineV0::Context.new, "page.html",
+        Plombir::Template::EngineV0::Partials.new, components
+      )
+    end
+
+    ex.message.to_s.should contain("✖ Unknown component")
+    ex.message.to_s.should contain("\"Nav\"")
+    ex.message.to_s.should contain("PostCard")
+    ex.message.to_s.should contain("page.html:1:1")
+  end
+
+  it "suggests the closest component name" do
+    components = {"PostCard" => "x"}
+
+    ex = expect_raises(Plombir::Template::Error) do
+      Plombir::Template::EngineV0.render(
+        "{% component \"PostCrad\" %}", Plombir::Template::EngineV0::Context.new, "page.html",
+        Plombir::Template::EngineV0::Partials.new, components
+      )
+    end
+
+    ex.message.to_s.should contain("Did you mean `PostCard`?")
+  end
+
+  it "rejects cyclic components with the chain" do
+    components = {"A" => "{% component \"B\" %}", "B" => "{% component \"A\" %}"}
+
+    ex = expect_raises(Plombir::Template::Error) do
+      Plombir::Template::EngineV0.render(
+        "{% component \"A\" %}", Plombir::Template::EngineV0::Context.new, "page.html",
+        Plombir::Template::EngineV0::Partials.new, components
+      )
+    end
+
+    ex.message.to_s.should contain("nested too deep")
+    ex.message.to_s.should contain("A → B → A")
   end
 
   it "renders includes from the partial map" do
