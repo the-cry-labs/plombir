@@ -31,3 +31,21 @@ poll the served HTML until the marker appears for edit latency.
   itself is sub-millisecond.
 - Layout edits rewrite only consumers (siblings byte-untouched,
   asserted via output mtimes in `spec/build/incremental_spec.cr`).
+
+## Templates (2026-09-19, Phase 4)
+
+`crystal run --release` on the same Ryzen 7 8845HS. Benches full
+index renders against `spec/fixtures/blog-site`: the `home` layout
+(conditional tagline, `limit:10` loop with one `PostCard` component
+per row, date/excerpt filters, footer include) composed inside
+`default` — i.e. the whole v1 surface, 10 collection rows.
+
+| Measurement | Result | Budget |
+|---|---|---|
+| 1000 index renders (10 rows each) | 140ms (0.14ms/render) | <500ms |
+
+Reproduce: build `vars` as `Build::Pipeline` does (title,
+description, `collections.posts` rows), load partials/components via
+`Page.partial_sources` / `Page.component_sources`, then render
+`home` inside `default` 1000× and time it (one-off script, removed
+after recording).
