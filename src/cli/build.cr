@@ -61,6 +61,7 @@ module Plombir
         output = config.build.output unless output_flag
         context = Plombir::Build::Context.new(directory, output, drafts, config.schemas, config.permalink_patterns)
         result = Plombir::Build::Pipeline.run(context)
+        result.warnings.each { |warning| error.puts "! #{warning}" }
         print_summary(result, io)
         0
       rescue ex : Plombir::Build::Error | Plombir::Frontmatter::Error | Plombir::Router::Conflict | Plombir::Renderer::LayoutNotFound
@@ -83,8 +84,10 @@ module Plombir
       def self.print_summary(result : Plombir::Build::Result, io : IO) : Nil
         documents = result.pages == 1 ? "document" : "documents"
         pages = result.pages == 1 ? "page" : "pages"
+        assets = result.assets == 1 ? "asset" : "assets"
         io.puts "✓ Loaded #{result.pages} #{documents}"
         io.puts "✓ Rendered #{result.pages} #{pages}"
+        io.puts "✓ Processed #{result.assets} #{assets}"
         io.puts ""
         io.puts "Built in #{result.elapsed_ms}ms"
         io.puts ""

@@ -2,12 +2,12 @@
 #
 # The pipeline is a fixed sequence of small stages (see `Pipeline.run`):
 # discover content, parse frontmatter, filter drafts, resolve routes,
-# render pages, copy `public/`, write files. Stages share only
-# `Build::Context`, so a future plugin hook can wrap them without
+# render pages, fingerprint `assets/`, copy `public/`, write files.
+# Stages share only `Build::Context`, so a future plugin hook can wrap them without
 # refactor (see roadmap Phase 7).
 #
-# Asset fingerprinting, collections, and `check` arrive in later phases;
-# this pipeline deliberately stops at HTML plus `public/` passthrough.
+# Collections and `check` arrived in earlier phases; SEO/feeds (Phase 5,
+# items 3–4) and the `asset_url` HTML rewrite (item 2) are still ahead.
 require "file_utils"
 
 module Plombir
@@ -55,20 +55,28 @@ module Plombir
         File.join(@root, "public")
       end
 
+      def assets_dir : String
+        File.join(@root, "assets")
+      end
+
       # Absolute path of the output directory.
       def output_dir : String
         Path[@output].absolute? ? @output : File.join(@root, @output)
       end
     end
 
-    # Outcome of one build: page count, wall-clock time, and the output
-    # directory as given (for display in the CLI summary).
+    # Outcome of one build: page count, fingerprinted asset count,
+    # non-fatal warnings (e.g. `public/` shadowing a generated asset),
+    # wall-clock time, and the output directory as given (for display
+    # in the CLI summary).
     struct Result
       getter pages : Int32
+      getter assets : Int32
+      getter warnings : Array(String)
       getter elapsed_ms : Int64
       getter output : String
 
-      def initialize(@pages : Int32, @elapsed_ms : Int64, @output : String)
+      def initialize(@pages : Int32, @elapsed_ms : Int64, @output : String, @assets : Int32 = 0, @warnings : Array(String) = [] of String)
       end
     end
 
@@ -87,9 +95,10 @@ module Plombir
         validate_schemas!(context, entries)
         routes = resolve(entries, context.patterns)
         render_all(entries, routes, context)
+        assets = process_assets(context)
         copy_public(context)
 
-        Result.new(routes.size, (Time.instant - started).total_milliseconds.to_i64, context.output)
+        Result.new(routes.size, (Time.instant - started).total_milliseconds.to_i64, context.output, assets.files.size, assets.warnings)
       end
 
       # Validates frontmatter against the context schemas, printing
@@ -207,13 +216,37 @@ module Plombir
         date ? date.to_s("%Y-%m-%d") : ""
       end
 
-      # Copies `public/` as-is; it holds unprocessed files that win by
-      # simply existing (the asset pipeline in Phase 5 adds hashing).
+      # Fingerprints `assets/` into the output directory and writes
+      # the manifest. Runs after rendering (so it lands inside the
+      # fresh output dir) and before `copy_public` (so `public/` wins
+      # collisions, with a warning carried on the `Result`).
+      def self.process_assets(context : Context) : Assets::Pipeline::Result
+        Assets::Pipeline.run(context.root, context.output_dir)
+      end
+
+      # Copies `public/` as-is, last, merging file-by-file so it wins
+      # over generated files (fingerprinted assets, HTML) on collision.
+      # A top-level `cp_r` would nest (`dist/assets/assets/…`) once the
+      # asset stage created `dist/assets/`; the recursive merge keeps
+      # `public/assets/style.css → dist/assets/style.css` exact.
       def self.copy_public(context : Context) : Nil
         public = context.public_dir
         return unless Dir.exists?(public)
-        Dir.each_child(public) do |name|
-          FileUtils.cp_r(File.join(public, name), File.join(context.output_dir, name))
+        copy_tree(public, context.output_dir)
+      end
+
+      # Recursively merges the *source* tree into *destination*,
+      # overwriting files (public wins) and preserving empty dirs.
+      private def self.copy_tree(source : String, destination : String) : Nil
+        Dir.mkdir_p(destination)
+        Dir.each_child(source) do |name|
+          from = File.join(source, name)
+          to = File.join(destination, name)
+          if File.directory?(from) && !File.symlink?(from)
+            copy_tree(from, to)
+          elsif File.file?(from)
+            FileUtils.cp(from, to)
+          end
         end
       end
 
@@ -225,6 +258,7 @@ module Plombir
           "site root" => context.root,
           "content"   => context.content_dir,
           "layouts"   => context.layouts_dir,
+          "assets"    => context.assets_dir,
           "public"    => context.public_dir,
         }
         watched.each do |label, dir|

@@ -13,6 +13,7 @@ describe Plombir::CLI::Build do
       error.to_s.should be_empty
       io.to_s.should contain("✓ Loaded 3 documents")
       io.to_s.should contain("✓ Rendered 3 pages")
+      io.to_s.should contain("✓ Processed 0 assets")
       io.to_s.should contain("Built in")
       io.to_s.should contain("Output: dist/")
       File.exists?(File.join(root, "dist", "index.html")).should be_true
