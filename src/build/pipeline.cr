@@ -104,6 +104,7 @@ module Plombir
         assets = process_assets(context)
         warnings = assets.warnings.dup
         render_all(entries, routes, context, assets.files, warnings)
+        write_seo_files(entries, routes, context)
         copy_public(context)
 
         Result.new(routes.size, (Time.instant - started).total_milliseconds.to_i64, context.output, assets.files.size, warnings)
@@ -268,10 +269,25 @@ module Plombir
         date ? date.to_s("%Y-%m-%d") : ""
       end
 
+      # Writes `sitemap.xml` and `robots.txt` from the route table.
+      # Root files by design, so a matching `public/` file cleanly
+      # overrides them later — the documented seam for staging rules
+      # and hand-written maps.
+      private def self.write_seo_files(entries : Array(Entry), routes : Hash(String, Router::Route), context : Context) : Nil
+        pages = entries.map do |entry|
+          route = routes[entry.page.relative_path]
+          date = entry.document.date(entry.page.mtime)
+          Seo::Sitemap::Page.new(route.url, date.try(&.to_s("%Y-%m-%d")))
+        end
+        Seo::Sitemap.write(context.output_dir, pages, context.site.url)
+        Seo::Robots.write(context.output_dir, context.site.url)
+      end
+
       # Fingerprints `assets/` into the output directory and writes
-      # the manifest. Runs after rendering (so it lands inside the
-      # fresh output dir) and before `copy_public` (so `public/` wins
-      # collisions, with a warning carried on the `Result`).
+      # the manifest. Runs before rendering so `| asset_url` and the
+      # rewrite pass resolve against it, and before `copy_public` so
+      # `public/` wins collisions (with a warning carried on the
+      # `Result`).
       def self.process_assets(context : Context) : Assets::Pipeline::Result
         Assets::Pipeline.run(context.root, context.output_dir)
       end

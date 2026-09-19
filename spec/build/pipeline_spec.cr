@@ -297,6 +297,28 @@ describe Plombir::Build::Pipeline do
       html.should_not contain("canonical")
     end
   end
+
+  it "writes sitemap and robots from the route table" do
+    with_tempdir do |dir|
+      root = write_site(dir, {
+        "content/index.md"     => "---\ntitle: Home\ndate: 2026-09-13\n---\n\n# Home\n",
+        "content/posts/hi.md"  => "---\ntitle: Hi\ndate: 2026-09-10\n---\n\n# Hi\n",
+        "layouts/default.html" => "<main>{{ content }}</main>\n",
+      })
+      site = Plombir::Config::Site.new("Blog", "", "https://x.example")
+      context = Plombir::Build::Context.new(root, site: site)
+
+      Plombir::Build::Pipeline.run(context)
+
+      sitemap = File.read(File.join(root, "dist", "sitemap.xml"))
+      sitemap.should contain("<loc>https://x.example/</loc>")
+      sitemap.should contain("<loc>https://x.example/posts/hi/</loc>")
+      sitemap.should contain("<lastmod>2026-09-13</lastmod>")
+      File.read(File.join(root, "dist", "robots.txt")).should contain(
+        "Sitemap: https://x.example/sitemap.xml"
+      )
+    end
+  end
   describe ".collection_vars" do
     it "exposes collections newest-first by effective date" do
       with_tempdir do |dir|
