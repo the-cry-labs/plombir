@@ -41,6 +41,13 @@ module Plombir
         text == "elsif" || text.starts_with?("elsif ")
       end
 
+      # A partial name for `{% include %}`: flat basenames only
+      # (`header`, `post-card`). No slashes or dots — partials live
+      # beside the layouts that use them, so `..` can never escape.
+      def self.partial_name?(text : String) : Bool
+        text.matches?(/\A[A-Za-z0-9_-]+\z/)
+      end
+
       private class Runner
         def initialize(@tokens : Array(Lexer::Token), @file : String, @lines : Array(String))
           @pos = 0
@@ -87,6 +94,7 @@ module Plombir
           tag = token.value
           return parse_if(token) if tag == "if" || tag.starts_with?("if ")
           return parse_for(token) if tag == "for" || tag.starts_with?("for ")
+          return parse_include(token) if tag == "include" || tag.starts_with?("include ")
           if tag == "else" || tag == "end" || Parser.elsif_tag?(tag)
             fail(token.line, token.column, Errors.stray_message(@file, token.line, token.column, tag))
           else
@@ -136,6 +144,26 @@ module Plombir
           end
           @pos += 1
           AST::ElsifBranch.new(condition, parse_list, opening.line, opening.column)
+        end
+
+        private def parse_include(opening : Lexer::Token) : AST::Include
+          name = unquoted(opening.value.lchop("include").strip)
+          if name.nil? || !Parser.partial_name?(name)
+            fail(opening.line, opening.column, Errors.include_syntax_message(@file, opening.line, opening.column))
+          end
+          @pos += 1
+          AST::Include.new(name, opening.line, opening.column)
+        end
+
+        # Strips one pair of matching single or double quotes. Returns
+        # nil for unquoted or mismatched text — include names are
+        # always quoted so partial references stay greppable.
+        private def unquoted(text : String) : String?
+          return nil if text.size < 2
+          opener = text[0]
+          return nil unless opener == '"' || opener == '\''
+          return nil unless text[-1] == opener
+          text[1...-1]
         end
 
         private def parse_for(opening : Lexer::Token) : AST::For

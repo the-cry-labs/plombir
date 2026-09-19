@@ -134,11 +134,12 @@ module Plombir
         FileUtils.rm_rf(context.output_dir)
         Dir.mkdir_p(context.output_dir)
         collections = collection_vars(entries, routes)
+        partials = Renderer::Page.partial_sources(context.layouts_dir)
         entries.each do |entry|
           route = routes[entry.page.relative_path]
           destination = File.join(context.output_dir, route.output_path)
           Dir.mkdir_p(File.dirname(destination))
-          File.write(destination, render_one(entry, route, context, collections))
+          File.write(destination, render_one(entry, route, context, collections, partials))
         end
       end
 
@@ -181,7 +182,9 @@ module Plombir
       # *collections* carries the `collections.*` template vars, so
       # index pages list their siblings with no custom code. It
       # defaults to empty so single-page callers stay simple.
-      def self.render_one(entry : Entry, route : Router::Route, context : Context, collections : Hash(String, Renderer::Page::Value) = {} of String => Renderer::Page::Value) : String
+      # *partials* defaults to loading from the context layouts on
+      # demand; the full pipeline passes a prebuilt map instead.
+      def self.render_one(entry : Entry, route : Router::Route, context : Context, collections : Hash(String, Renderer::Page::Value) = {} of String => Renderer::Page::Value, partials : Renderer::Page::Partials? = nil) : String
         body = Markdown.render(entry.document.body)
         vars = Renderer::Page::Context.new
         slug = Router.slugify(File.basename(entry.page.relative_path, ".md"))
@@ -191,7 +194,7 @@ module Plombir
         vars["tags"] = entry.document.tags
         vars["url"] = route.url
         collections.each { |key, value| vars[key] = value }
-        Renderer::Page.render_file(body, entry.document.layout, context.layouts_dir, vars, entry.page.relative_path)
+        Renderer::Page.render_file(body, entry.document.layout, context.layouts_dir, vars, entry.page.relative_path, nil, partials)
       end
 
       private def self.format_date(date : Time?) : String

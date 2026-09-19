@@ -44,6 +44,7 @@ describe Plombir::Template::Errors do
     Plombir::Template::Errors.closest("endfor", Plombir::Template::Errors::TAG_NAMES).should eq("end")
     Plombir::Template::Errors.closest("iff", Plombir::Template::Errors::TAG_NAMES).should eq("if")
     Plombir::Template::Errors.closest("elsfi", Plombir::Template::Errors::TAG_NAMES).should eq("elsif")
+    Plombir::Template::Errors.closest("incldue", Plombir::Template::Errors::TAG_NAMES).should eq("include")
   end
 
   it "returns nil when nothing is near enough" do

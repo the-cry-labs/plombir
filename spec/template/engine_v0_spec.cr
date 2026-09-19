@@ -142,11 +142,84 @@ describe Plombir::Template::EngineV0 do
 
   it "rejects unknown tags and lists valid choices" do
     ex = expect_raises(Plombir::Template::Error) do
-      Plombir::Template::EngineV0.render("{% include \"header\" %}", Plombir::Template::EngineV0::Context.new, "page.html")
+      Plombir::Template::EngineV0.render("{% embed \"header\" %}", Plombir::Template::EngineV0::Context.new, "page.html")
     end
 
     ex.message.to_s.should contain("Unknown tag")
-    %w[if for else end].each { |tag| ex.message.to_s.should contain(tag) }
+    %w[if elsif for include else end].each { |tag| ex.message.to_s.should contain(tag) }
+  end
+
+  it "renders includes from the partial map" do
+    context = {"title" => "Hi"} of String => Plombir::Template::EngineV0::Value
+    includes = {"header" => "<header>{{ title }}</header>"}
+
+    Plombir::Template::EngineV0.render("<body>{% include \"header\" %}</body>", context, "page.html", includes).should eq(
+      "<body><header>Hi</header></body>"
+    )
+  end
+
+  it "shares loop scope with includes" do
+    context = {"tags" => ["a", "b"]} of String => Plombir::Template::EngineV0::Value
+    includes = {"chip" => "<span>{{ tag }}</span>"}
+    template = "{% for tag in tags %}{% include \"chip\" %}{% end %}"
+
+    Plombir::Template::EngineV0.render(template, context, "page.html", includes).should eq("<span>a</span><span>b</span>")
+  end
+
+  it "nests includes inside includes" do
+    includes = {"outer" => "a{% include \"inner\" %}c", "inner" => "b"}
+
+    Plombir::Template::EngineV0.render("{% include \"outer\" %}", Plombir::Template::EngineV0::Context.new, "page.html", includes).should eq("abc")
+  end
+
+  it "fails missing includes with available names" do
+    includes = {"header" => "x"}
+
+    ex = expect_raises(Plombir::Template::Error) do
+      Plombir::Template::EngineV0.render("<body>{% include \"footer\" %}</body>", Plombir::Template::EngineV0::Context.new, "page.html", includes)
+    end
+
+    ex.file.should eq("page.html")
+    ex.line.should eq(1)
+    ex.column.should eq(7)
+    ex.message.to_s.should contain("✖ Unknown include")
+    ex.message.to_s.should contain("page.html:1:7")
+    ex.message.to_s.should contain("\"footer\"")
+    ex.message.to_s.should contain("header")
+    ex.message.to_s.should contain("1 │ <body>{% include \"footer\" %}</body>")
+  end
+
+  it "suggests the closest include name" do
+    includes = {"footer" => "x"}
+
+    ex = expect_raises(Plombir::Template::Error) do
+      Plombir::Template::EngineV0.render("{% include \"footr\" %}", Plombir::Template::EngineV0::Context.new, "page.html", includes)
+    end
+
+    ex.message.to_s.should contain("Did you mean `footer`?")
+  end
+
+  it "rejects cyclic includes with the chain" do
+    includes = {"a" => "{% include \"b\" %}", "b" => "{% include \"a\" %}"}
+
+    ex = expect_raises(Plombir::Template::Error) do
+      Plombir::Template::EngineV0.render("{% include \"a\" %}", Plombir::Template::EngineV0::Context.new, "page.html", includes)
+    end
+
+    ex.message.to_s.should contain("nested too deep")
+    ex.message.to_s.should contain("max 10")
+    ex.message.to_s.should contain("a → b → a")
+  end
+
+  it "attributes partial failures to the include" do
+    includes = {"broken" => "{% if x %}oops"}
+
+    ex = expect_raises(Plombir::Template::Error) do
+      Plombir::Template::EngineV0.render("{% include \"broken\" %}", Plombir::Template::EngineV0::Context.new, "page.html", includes)
+    end
+
+    ex.message.to_s.should contain("(include \"broken\")")
+    ex.message.to_s.should contain("no matching `{% end %}`")
   end
 
   it "rejects stray closers" do
