@@ -113,6 +113,20 @@ describe Plombir::Template::Parser do
     ex.message.to_s.should contain("Available tags")
   end
 
+  it "suggests the closest tag name" do
+    ex = parse_error("{% endfor %}")
+
+    ex.message.to_s.should contain("Unknown tag")
+    ex.message.to_s.should contain("Did you mean `end`?")
+  end
+
+  it "stays silent when no tag is close" do
+    ex = parse_error("{% xyz %}")
+
+    ex.message.to_s.should contain("Unknown tag")
+    ex.message.to_s.should_not contain("Did you mean")
+  end
+
   it "rejects bad variable names" do
     ex = parse_error("{{ title | upcase }}")
 
