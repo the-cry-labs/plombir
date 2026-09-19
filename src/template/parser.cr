@@ -10,6 +10,11 @@
 module Plombir
   module Template
     module Parser
+      # Caps `{% if %}` / `{% for %}` nesting. Layouts nest a handful
+      # of levels; past this the input is runaway, and failing here
+      # keeps both the parser and the renderer's recursion shallow.
+      MAX_NESTING = 100
+
       # Parses *tokens* (from `Lexer.tokenize`) into a node list.
       # *lines* is the template split on `\n`, used for the source-line
       # footer in diagnostics.
@@ -53,6 +58,7 @@ module Plombir
       private class Runner
         def initialize(@tokens : Array(Lexer::Token), @file : String, @lines : Array(String))
           @pos = 0
+          @depth = 0
         end
 
         def parse_template : Array(AST::Node)
@@ -114,6 +120,7 @@ module Plombir
             fail(opening.line, opening.column, Errors.if_message(@file, opening.line, opening.column))
           end
           @pos += 1
+          enter_nesting(opening)
           body = parse_list
           elsifs = [] of AST::ElsifBranch
           while @pos < @tokens.size
@@ -136,6 +143,7 @@ module Plombir
               end
             end
           end
+          exit_nesting
           unless terminator?("end")
             fail(opening.line, opening.column, Errors.unterminated_message(@file, opening.line, opening.column))
           end
@@ -319,7 +327,9 @@ module Plombir
           end
           limit, offset = parse_window(parts[4..], opening)
           @pos += 1
+          enter_nesting(opening)
           body = parse_list
+          exit_nesting
           if terminator?("else")
             fail(opening.line, opening.column, Errors.else_message(@file, opening.line, opening.column))
           end
@@ -362,6 +372,21 @@ module Plombir
 
         private def terminator?(word : String) : Bool
           @pos < @tokens.size && @tokens[@pos].tag? && @tokens[@pos].value == word
+        end
+
+        # Enters one block level, failing past the nesting cap so
+        # runaway layouts cannot overflow the parser's (or the
+        # renderer's) call stack. Raised failures unwind the whole
+        # parse, so only the normal path balances the counter.
+        private def enter_nesting(opening : Lexer::Token) : Nil
+          @depth += 1
+          if @depth > Parser::MAX_NESTING
+            fail(opening.line, opening.column, Errors.nesting_message(@file, opening.line, opening.column, Parser::MAX_NESTING))
+          end
+        end
+
+        private def exit_nesting : Nil
+          @depth -= 1
         end
 
         private def fail(line : Int32, column : Int32, message : String) : NoReturn

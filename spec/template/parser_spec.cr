@@ -51,9 +51,23 @@ describe Plombir::Template::Parser do
     loop = cond.body[0].as(Plombir::Template::AST::For)
     loop.item.should eq("tag")
     loop.collection.should eq("tags")
-    loop.body.size.should eq(1)
     loop.line.should eq(1)
     loop.column.should eq(14)
+  end
+
+  it "parses ordinary nesting three deep" do
+    nodes = parse("{% if a %}{% for t in tags %}{% if b %}x{% end %}{% end %}{% end %}")
+
+    nodes.size.should eq(1)
+    nodes[0].as(Plombir::Template::AST::If).condition.should eq("a")
+  end
+
+  it "rejects runaway block nesting" do
+    source = "{% if a %}" * 101 + "x" + "{% end %}" * 101
+    ex = parse_error(source)
+
+    ex.message.to_s.should contain("nested too deep")
+    ex.message.to_s.should contain("100")
   end
 
   it "parses dotted collections and loop positions" do

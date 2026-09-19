@@ -276,6 +276,15 @@ module Plombir
         end
       end
 
+      def self.nesting_message(file : String, line : Int32, column : Int32, max : Int32) : String
+        String.build do |io|
+          io << "✖ Blocks nested too deep\n\n"
+          io << loc(file, line, column) << "\n\n"
+          io << "This block nests deeper than #{max} levels.\n\n"
+          io << "Split the layout into includes or components instead of nesting further."
+        end
+      end
+
       private def self.loc(file : String, line : Int32, column : Int32) : String
         "#{file}:#{line}:#{column}"
       end
