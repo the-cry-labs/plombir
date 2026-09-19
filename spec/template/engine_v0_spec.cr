@@ -187,6 +187,22 @@ describe Plombir::Template::EngineV0 do
     Plombir::Template::EngineV0.render("{{ title | slugify }}", context).should eq("hello-world")
   end
 
+  it "resolves asset urls through the manifest" do
+    context = {"cover" => "cabin.jpg"} of String => Plombir::Template::EngineV0::Value
+    manifest = {"cabin.jpg" => "assets/cabin.a1b2c3d4.jpg"}
+
+    rendered = Plombir::Template::EngineV0.render("{{ cover | asset_url }}", context, "<input>",
+      Plombir::Template::EngineV0::Partials.new, Plombir::Template::EngineV0::Components.new, manifest)
+
+    rendered.should eq("/assets/cabin.a1b2c3d4.jpg")
+  end
+
+  it "falls back to the unfingerprinted form without a manifest entry" do
+    context = {"cover" => "cabin.jpg"} of String => Plombir::Template::EngineV0::Value
+
+    Plombir::Template::EngineV0.render("{{ cover | asset_url }}", context).should eq("/assets/cabin.jpg")
+  end
+
   it "strips tags but keeps trailing bare brackets literal" do
     context = {"x" => "a < b"} of String => Plombir::Template::EngineV0::Value
 

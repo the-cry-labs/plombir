@@ -69,3 +69,24 @@ describe Plombir::Assets::Rewrite do
     result.missing.should be_empty
   end
 end
+
+describe Plombir::Assets::Rewrite, ".asset_url" do
+  manifest = {"style.css" => "assets/style.a1b2c3d4.css"}
+
+  it "returns the fingerprinted url on a manifest hit" do
+    Plombir::Assets::Rewrite.asset_url("style.css", manifest).should eq("/assets/style.a1b2c3d4.css")
+  end
+
+  it "strips leading slashes and assets prefixes before lookup" do
+    Plombir::Assets::Rewrite.asset_url("/assets/style.css", manifest).should eq("/assets/style.a1b2c3d4.css")
+    Plombir::Assets::Rewrite.asset_url("assets/style.css", manifest).should eq("/assets/style.a1b2c3d4.css")
+  end
+
+  it "falls back to the unfingerprinted form on a miss" do
+    Plombir::Assets::Rewrite.asset_url("logo.png", manifest).should eq("/assets/logo.png")
+  end
+
+  it "renders empty input as empty" do
+    Plombir::Assets::Rewrite.asset_url("", manifest).should eq("")
+  end
+end

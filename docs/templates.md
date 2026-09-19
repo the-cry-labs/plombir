@@ -39,12 +39,24 @@ kept (`date: "a|b"`).
 | `date` | optional `Time` pattern, default `%Y-%m-%d` | `{{ post.date \| date: "%Y/%m" }}` (input `YYYY-MM-DD` or RFC 3339) |
 | `slugify` | none | `{{ title \| slugify }}` (same definition as routing slugs) |
 | `jsonify` | none | `{{ tags \| jsonify }}` (emits a JSON value, never escaped) |
+| `asset_url` | none | `{{ cover \| asset_url }}` (fingerprinted URL from the asset manifest, `/assets/…` fallback) |
 
 Escaping: `{{ title }}` escapes by default and filtered output keeps
 that rule — unless the value is a raw slot (`content`, `*.content`)
 or the chain contains `| escape` / `| jsonify` (already safe). So
 `{{ title | truncate: 5 }}` escapes once, `{{ title | escape }}`
 escapes exactly once, and `{{ content | strip_html }}` stays raw.
+
+Static asset references need no helper: any absolute `/assets/…`
+`src`/`href` in layouts, components, or content is rewritten to its
+fingerprinted URL at build time (`/assets/style.css` →
+`/assets/style.a1b2c3d4.css`), preserving `?query`/`#fragment`. Use
+`| asset_url` for paths held in variables
+(`<img src="{{ post.cover | asset_url }}">`). A reference backed by
+neither `assets/` nor `public/` renders unchanged and warns at build
+time (failing under `build --strict`); `plombir check` reports it as
+a missing asset. Not rewritten: relative refs (write absolute
+`/assets/…` paths instead), `srcset`, and unquoted attributes.
 
 ## Conditionals
 
@@ -368,6 +380,7 @@ Available filters:
   date
   slugify
   jsonify
+  asset_url
 
 
 1 │ {{ title | truncatee }}

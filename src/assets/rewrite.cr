@@ -54,6 +54,29 @@ module Plombir
         Result.new(buffer.to_s, missing.uniq)
       end
 
+      # Resolves one asset *path* to its public URL through *manifest*:
+      # a hit returns the fingerprinted URL, a miss the unfingerprinted
+      # `/assets/…` form (backed by `public/`, or reported missing by
+      # the rewrite pass). The `| asset_url` filter delegates here so
+      # both spellings share one rule.
+      #
+      # ```
+      # Rewrite.asset_url("style.css", {"style.css" => "assets/style.a1b2c3d4.css"})
+      # # => "/assets/style.a1b2c3d4.css"
+      # Rewrite.asset_url("logo.png", {} of String => String)
+      # # => "/assets/logo.png"
+      # ```
+      def self.asset_url(path : String, manifest : Hash(String, String)) : String
+        bare = path.starts_with?("/") ? path[1..] : path
+        bare = bare.starts_with?(OUTPUT_DIR + "/") ? bare[OUTPUT_DIR.size + 1..] : bare
+        return "" if bare.empty?
+        if mapped = manifest[bare]?
+          "/" + mapped
+        else
+          "/" + OUTPUT_DIR + "/" + bare
+        end
+      end
+
       # Quoted `src`/`href`, either quote style, attribute name in any
       # case. Group 1 is `src="` (prefix), 2 the quote, 3 the URL.
       REF = /((?:src|href)\s*=\s*)(["'])([^"']*)\2/i
