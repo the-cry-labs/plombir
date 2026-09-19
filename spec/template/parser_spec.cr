@@ -106,8 +106,32 @@ describe Plombir::Template::Parser do
     ex.message.to_s.should contain("only valid directly inside `{% if %}`")
   end
 
+  it "parses includes with single or double quotes" do
+    double = parse("{% include \"header\" %}")[0].as(Plombir::Template::AST::Include)
+    single = parse("x{% include 'post-card' %}")[1].as(Plombir::Template::AST::Include)
+
+    double.name.should eq("header")
+    double.line.should eq(1)
+    double.column.should eq(1)
+    single.name.should eq("post-card")
+  end
+
+  it "rejects unquoted include names" do
+    ex = parse_error("{% include header %}")
+
+    ex.message.to_s.should contain("Expected `{% include \"name\" %}`")
+  end
+
+  it "rejects include names outside layouts" do
+    ["../secret", "a/b", "x.html", ""].each do |name|
+      ex = parse_error("{% include \"#{name}\" %}")
+
+      ex.message.to_s.should contain("Expected `{% include \"name\" %}`")
+    end
+  end
+
   it "rejects unknown tags" do
-    ex = parse_error("{% include \"header\" %}")
+    ex = parse_error("{% embed \"header\" %}")
 
     ex.message.to_s.should contain("Unknown tag")
     ex.message.to_s.should contain("Available tags")

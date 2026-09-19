@@ -4,9 +4,9 @@
 # The parser builds these nodes from `Lexer` tokens; every node keeps
 # the 1-based line and column where its opening delimiter sits, so
 # render-time failures point at the author's source. The tree covers
-# the v0 surface — text, dotted-name variables, `if`/`elsif`/`else`,
-# `for` with `limit`/`offset` — and grows with later slices (filters,
-# includes, components).
+# text, dotted-name variables, `if`/`elsif`/`else`, `for` with
+# `limit`/`offset`, and `include` — and grows with later slices
+# (filters, components).
 module Plombir
   module Template
     module AST
@@ -80,6 +80,17 @@ module Plombir
         getter offset : Int32
 
         def initialize(@item : String, @collection : String, @body : Array(Node), @limit : Int32?, @offset : Int32, line : Int32, column : Int32)
+          super(line, column)
+        end
+      end
+
+      # `{% include "header" %}`. *name* is the partial's basename
+      # under `layouts/` (no extension, no slashes) — the caller
+      # supplies the sources, so the node only names them.
+      class Include < Node
+        getter name : String
+
+        def initialize(@name : String, line : Int32, column : Int32)
           super(line, column)
         end
       end

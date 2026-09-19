@@ -37,6 +37,67 @@ describe Plombir::Renderer::Page do
     end
   end
 
+  it "inlines layout partials from disk" do
+    with_tempdir do |dir|
+      layouts = File.join(dir, "layouts")
+      Dir.mkdir_p(layouts)
+      File.write(File.join(layouts, "header.html"), "<header>{{ title }}</header>")
+      File.write(File.join(layouts, "post.html"), "<article>{% include \"header\" %}{{ content }}</article>")
+
+      vars : Plombir::Renderer::Page::Context = {"title" => "Hi"} of String => Plombir::Renderer::Page::Value
+      Plombir::Renderer::Page.render_file("<p>Hi.</p>", "post", layouts, vars, "content/a.md").should eq(
+        "<article><header>Hi</header><p>Hi.</p></article>"
+      )
+    end
+  end
+
+  it "lists available partials for missing includes" do
+    with_tempdir do |dir|
+      layouts = File.join(dir, "layouts")
+      Dir.mkdir_p(layouts)
+      File.write(File.join(layouts, "header.html"), "x")
+      File.write(File.join(layouts, "post.html"), "{% include \"footer\" %}")
+
+      ex = expect_raises(Plombir::Template::Error) do
+        Plombir::Renderer::Page.render_file("body", "post", layouts, Plombir::Renderer::Page::Context.new, "content/a.md")
+      end
+
+      ex.message.to_s.should contain("✖ Unknown include")
+      ex.message.to_s.should contain("\"footer\"")
+      ex.message.to_s.should contain("header")
+    end
+  end
+
+  it "rejects cyclic partials on disk" do
+    with_tempdir do |dir|
+      layouts = File.join(dir, "layouts")
+      Dir.mkdir_p(layouts)
+      File.write(File.join(layouts, "a.html"), "{% include \"b\" %}")
+      File.write(File.join(layouts, "b.html"), "{% include \"a\" %}")
+      File.write(File.join(layouts, "post.html"), "{% include \"a\" %}{{ content }}")
+
+      ex = expect_raises(Plombir::Template::Error) do
+        Plombir::Renderer::Page.render_file("body", "post", layouts, Plombir::Renderer::Page::Context.new, "content/a.md")
+      end
+
+      ex.message.to_s.should contain("nested too deep")
+      ex.message.to_s.should contain("a → b → a")
+    end
+  end
+
+  it "loads every layout body as a partial source" do
+    with_tempdir do |dir|
+      layouts = File.join(dir, "layouts")
+      Dir.mkdir_p(layouts)
+      File.write(File.join(layouts, "header.html"), "---\nlayout: default\n---\n<partial-header>")
+
+      sources = Plombir::Renderer::Page.partial_sources(layouts)
+
+      sources["header"].should eq("<partial-header>")
+      Plombir::Renderer::Page.partial_sources(File.join(dir, "missing")).should be_empty
+    end
+  end
+
   it "nests layouts through frontmatter parents" do
     with_tempdir do |dir|
       layouts = File.join(dir, "layouts")

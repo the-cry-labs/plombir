@@ -27,7 +27,7 @@ module Plombir
       # Names the engine understands in `{% %}`. Shared by the
       # unknown-tag diagnostic and its closest-name hint so the two
       # can never drift apart.
-      TAG_NAMES = ["if", "elsif", "for", "else", "end"]
+      TAG_NAMES = ["if", "elsif", "for", "include", "else", "end"]
 
       # Raises an `Error` for *file* at *line*:*column*, appending the
       # offending source line from *lines* (the template split on
@@ -114,6 +114,44 @@ module Plombir
           io << loc(file, line, column) << "\n\n"
           io << "`{% elsif %}` must come before `{% else %}` in the same block.\n\n"
           io << "Example:\n{% if a %}x{% elsif b %}y{% else %}z{% end %}\n"
+        end
+      end
+
+      def self.include_syntax_message(file : String, line : Int32, column : Int32) : String
+        String.build do |io|
+          io << "✖ Invalid template\n\n"
+          io << loc(file, line, column) << "\n\n"
+          io << "Expected `{% include \"name\" %}` with a quoted partial name.\n\n"
+          io << "Example:\n{% include \"header\" %}\n"
+        end
+      end
+
+      def self.include_message(file : String, line : Int32, column : Int32, name : String, available : Array(String)) : String
+        String.build do |io|
+          io << "✖ Unknown include\n\n"
+          io << loc(file, line, column) << "\n\n"
+          io << "Unknown include: #{name.inspect}\n\n"
+          if hint = suggest(name, available)
+            io << hint
+          end
+          if available.empty?
+            io << "No partials found. Add one under layouts/ (e.g. layouts/header.html).\n"
+          else
+            io << "Available includes:\n"
+            available.each do |candidate|
+              io << "  " << candidate << "\n"
+            end
+          end
+        end
+      end
+
+      def self.include_depth_message(file : String, line : Int32, column : Int32, chain : Array(String), max : Int32) : String
+        String.build do |io|
+          io << "✖ Includes nested too deep\n\n"
+          io << loc(file, line, column) << "\n\n"
+          io << "#{chain.last.inspect} exceeds the include limit (max #{max}):\n\n"
+          io << "  " << chain.join(" → ") << "\n\n"
+          io << "Partials cannot include each other in a cycle. Remove the circular include."
         end
       end
 
