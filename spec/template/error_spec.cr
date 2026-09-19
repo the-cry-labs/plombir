@@ -43,6 +43,7 @@ describe Plombir::Template::Errors do
   it "finds the closest name" do
     Plombir::Template::Errors.closest("endfor", Plombir::Template::Errors::TAG_NAMES).should eq("end")
     Plombir::Template::Errors.closest("iff", Plombir::Template::Errors::TAG_NAMES).should eq("if")
+    Plombir::Template::Errors.closest("elsfi", Plombir::Template::Errors::TAG_NAMES).should eq("elsif")
   end
 
   it "returns nil when nothing is near enough" do

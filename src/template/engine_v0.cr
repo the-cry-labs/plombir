@@ -1,13 +1,14 @@
 # Plombir::Template::EngineV0 is the minimal layout renderer for the MVP slice.
 #
 # Pipeline: `Lexer.tokenize` → `Parser.parse` → render the `AST`.
-# It supports exactly four constructs (see `docs/adr/003-layout-slot.md`):
-# `{{ var }}` interpolation with dotted lookup, the raw `{{ content }}` slot,
-# `{% if %}` conditionals, and `{% for %}` loops. Everything else raises a
+# It supports variables with dotted lookup, the raw `{{ content }}`
+# slot, `{% if %}`/`{% elsif %}`/`{% else %}` conditionals,
+# `{% for %}` loops with `limit:N`/`offset:N`, and `{# comments #}`
+# (see `docs/adr/003-layout-slot.md`). Everything else raises a
 # `Template::Error` with a `file:line:col` diagnostic plus source line.
 #
-# Full syntax (variables, filters, components, inheritance) lands with the
-# Phase 4 engine behind the same call shape; callers only use `render`.
+# Full syntax (filters, includes, components) lands in later Phase 4
+# slices behind the same call shape; callers only use `render`.
 module Plombir
   module Template
     module EngineV0
@@ -52,19 +53,21 @@ module Plombir
           when AST::If
             if truthy?(lookup(node.condition, context, scope))
               out << render_nodes(node.body, context, scope, file, lines)
+            elsif branch = node.elsifs.find { |candidate| truthy?(lookup(candidate.condition, context, scope)) }
+              out << render_nodes(branch.body, context, scope, file, lines)
             else
               out << render_nodes(node.else_body, context, scope, file, lines)
             end
           when AST::For
             collection = lookup(node.collection, context, scope)
             if list = collection.as?(Array(String))
-              list.each do |element|
+              windowed(list, node.limit, node.offset).each do |element|
                 child = scope.dup
                 child[node.item] = element
                 out << render_nodes(node.body, context, child, file, lines)
               end
             elsif rows = collection.as?(Array(Hash(String, String)))
-              rows.each do |row|
+              windowed(rows, node.limit, node.offset).each do |row|
                 child = scope.dup
                 row.each { |key, val| child["#{node.item}.#{key}"] = val }
                 out << render_nodes(node.body, context, child, file, lines)
@@ -78,6 +81,14 @@ module Plombir
 
       private def self.lookup(name : String, context : Context, scope : Context) : Value
         scope.fetch(name) { context.fetch(name, nil) }
+      end
+
+      # Applies a loop's `offset`/`limit` window. `nil` limit renders
+      # to the end; an offset past the end renders nothing.
+      private def self.windowed(rows : Array(T), limit : Int32?, offset : Int32) : Array(T) forall T
+        return [] of T if offset >= rows.size
+        window = rows[offset..]
+        limit.nil? ? window : window.first(limit)
       end
 
       # `{{ content }}` (and any `*.content`) is raw HTML; every other

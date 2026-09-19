@@ -27,7 +27,7 @@ module Plombir
       # Names the engine understands in `{% %}`. Shared by the
       # unknown-tag diagnostic and its closest-name hint so the two
       # can never drift apart.
-      TAG_NAMES = ["if", "for", "else", "end"]
+      TAG_NAMES = ["if", "elsif", "for", "else", "end"]
 
       # Raises an `Error` for *file* at *line*:*column*, appending the
       # offending source line from *lines* (the template split on
@@ -76,7 +76,8 @@ module Plombir
           io << "✖ Invalid template\n\n"
           io << loc(file, line, column) << "\n\n"
           io << "Expected `{% for item in list %}`.\n\n"
-          io << "Example:\n{% for tag in tags %}<span>{{ tag }}</span>{% end %}\n"
+          io << "Example:\n{% for tag in tags %}<span>{{ tag }}</span>{% end %}\n\n"
+          io << "Paginate with `limit:N` / `offset:N` (either order, once each):\n{% for post in posts limit:5 %}{{ post.title }}{% end %}\n"
         end
       end
 
@@ -95,6 +96,24 @@ module Plombir
           io << loc(file, line, column) << "\n\n"
           io << "`{% else %}` is only valid directly inside `{% if %}` (one per block).\n\n"
           io << "Example:\n{% if title %}{{ title }}{% else %}Untitled{% end %}\n"
+        end
+      end
+
+      def self.elsif_message(file : String, line : Int32, column : Int32) : String
+        String.build do |io|
+          io << "✖ Invalid template\n\n"
+          io << loc(file, line, column) << "\n\n"
+          io << "Expected `{% elsif variable %}` with a variable name.\n\n"
+          io << "Example:\n{% if stock %}In stock{% elsif preorder %}Pre-order{% end %}\n"
+        end
+      end
+
+      def self.elsif_order_message(file : String, line : Int32, column : Int32) : String
+        String.build do |io|
+          io << "✖ Invalid template\n\n"
+          io << loc(file, line, column) << "\n\n"
+          io << "`{% elsif %}` must come before `{% else %}` in the same block.\n\n"
+          io << "Example:\n{% if a %}x{% elsif b %}y{% else %}z{% end %}\n"
         end
       end
 
