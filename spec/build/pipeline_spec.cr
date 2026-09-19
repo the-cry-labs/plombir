@@ -319,6 +319,35 @@ describe Plombir::Build::Pipeline do
       )
     end
   end
+
+  it "writes rss for posts and skips it without posts" do
+    with_tempdir do |dir|
+      root = write_site(dir, {
+        "content/index.md"     => "---\ntitle: Home\n---\n\n# Home\n",
+        "content/posts/hi.md"  => "---\ntitle: Hi\ndate: 2026-09-10\n---\n\n# Hi\n\nBody text.\n",
+        "layouts/default.html" => "<main>{{ content }}</main>\n",
+      })
+      site = Plombir::Config::Site.new("Blog", "Blurb", "https://x.example")
+
+      Plombir::Build::Pipeline.run(Plombir::Build::Context.new(root, site: site))
+
+      rss = File.read(File.join(root, "dist", "rss.xml"))
+      rss.should contain("<title>Blog</title>")
+      rss.should contain("<link>https://x.example/posts/hi/</link>")
+      rss.should contain("<pubDate>Thu, 10 Sep 2026 00:00:00 GMT</pubDate>")
+    end
+
+    with_tempdir do |dir|
+      root = write_site(dir, {
+        "content/index.md"     => "---\ntitle: Home\n---\n\n# Home\n",
+        "layouts/default.html" => "<main>{{ content }}</main>\n",
+      })
+
+      Plombir::Build::Pipeline.run(Plombir::Build::Context.new(root))
+
+      File.exists?(File.join(root, "dist", "rss.xml")).should be_false
+    end
+  end
   describe ".collection_vars" do
     it "exposes collections newest-first by effective date" do
       with_tempdir do |dir|

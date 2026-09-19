@@ -269,10 +269,10 @@ module Plombir
         date ? date.to_s("%Y-%m-%d") : ""
       end
 
-      # Writes `sitemap.xml` and `robots.txt` from the route table.
-      # Root files by design, so a matching `public/` file cleanly
-      # overrides them later — the documented seam for staging rules
-      # and hand-written maps.
+      # Writes `sitemap.xml`, `robots.txt`, and `rss.xml` (the last
+      # only when `posts` has entries). Root files by design, so a
+      # matching `public/` file cleanly overrides them later — the
+      # documented seam for staging rules and hand-written maps.
       private def self.write_seo_files(entries : Array(Entry), routes : Hash(String, Router::Route), context : Context) : Nil
         pages = entries.map do |entry|
           route = routes[entry.page.relative_path]
@@ -281,6 +281,37 @@ module Plombir
         end
         Seo::Sitemap.write(context.output_dir, pages, context.site.url)
         Seo::Robots.write(context.output_dir, context.site.url)
+        items = feed_items(entries, routes)
+        Feeds::Rss.write(context.output_dir, items, context.site) unless items.empty?
+      end
+
+      # `posts` entries newest-first (same ordering as
+      # `collection_vars`: dated first, most recent first, ties by
+      # path), capped at `Feeds::Rss::LIMIT`, with rendered bodies for
+      # `content:encoded`.
+      private def self.feed_items(entries : Array(Entry), routes : Hash(String, Router::Route)) : Array(Feeds::Rss::Item)
+        posts = entries.select do |entry|
+          Content::Collection.collection_name(entry.page.relative_path) == Feeds::Rss::COLLECTION
+        end
+        posts.sort! do |a, b|
+          date_a = a.document.date(a.page.mtime)
+          date_b = b.document.date(b.page.mtime)
+          dated = (date_a.nil? ? 1 : 0) <=> (date_b.nil? ? 1 : 0)
+          next dated unless dated == 0
+          recent = (date_b.try(&.to_unix) || 0_i64) <=> (date_a.try(&.to_unix) || 0_i64)
+          next recent unless recent == 0
+          a.page.relative_path <=> b.page.relative_path
+        end
+        posts.first(Feeds::Rss::LIMIT).map do |entry|
+          slug = Router.slugify(File.basename(entry.page.relative_path, ".md"))
+          Feeds::Rss::Item.new(
+            entry.document.title(slug),
+            routes[entry.page.relative_path].url,
+            entry.document.date(entry.page.mtime),
+            Content::Document.excerpt(entry.document),
+            Markdown.render(entry.document.body)
+          )
+        end
       end
 
       # Fingerprints `assets/` into the output directory and writes
