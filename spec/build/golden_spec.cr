@@ -2,6 +2,11 @@ require "../spec_helper"
 
 FIXTURES_DIR = File.expand_path(File.join(__DIR__, "..", "fixtures"))
 
+# Frozen clock for source mtimes: missing `date:` frontmatter falls
+# back to the file mtime (ADR-002), which feeds rendered dates and
+# sitemap lastmods — unpinned, goldens would drift daily.
+FROZEN_MTIME = Time.utc(2026, 9, 13)
+
 describe "golden fixtures" do
   it "builds minimal-site byte-identical to expected/" do
     assert_golden("minimal-site")
@@ -22,6 +27,14 @@ describe "golden fixtures" do
   it "builds schema-site byte-identical to expected/" do
     assert_golden("schema-site")
   end
+
+  it "builds assets-site byte-identical to expected/" do
+    assert_golden("assets-site")
+  end
+
+  it "builds seo-site byte-identical to expected/" do
+    assert_golden("seo-site")
+  end
 end
 
 # Copies the fixture (minus expected/) to a temp dir, builds it with
@@ -37,6 +50,9 @@ private def assert_golden(name : String) : Nil
     Dir.each_child(fixture) do |entry|
       next if entry == "expected"
       FileUtils.cp_r(File.join(fixture, entry), File.join(root, entry))
+    end
+    Dir.glob(File.join(root, "**", "*")).each do |path|
+      File.touch(path, FROZEN_MTIME) if File.file?(path)
     end
     config = Plombir::Config.load(root)
     context = Plombir::Build::Context.new(root, config.build.output, false, config.schemas, config.permalink_patterns, config.site)

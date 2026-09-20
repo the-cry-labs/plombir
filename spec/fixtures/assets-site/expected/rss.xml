@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>Asset Fixture</title><link>https://assets.example.com/</link><description>A fixture for the asset pipeline.</description><item><title>First Post</title><link>https://assets.example.com/posts/first/</link><pubDate>Thu, 10 Sep 2026 00:00:00 GMT</pubDate><description>A post so the feed and sitemap have something to list.</description><content:encoded>&lt;h1&gt;First Post&lt;/h1&gt;
+&lt;p&gt;A post so the feed and sitemap have something to list.&lt;/p&gt;
+</content:encoded></item></channel></rss>

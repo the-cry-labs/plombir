@@ -115,4 +115,31 @@ describe "content-model fixtures" do
       routes.first.hint.should contain("permalink")
     end
   end
+
+  it "assets-site builds and checks clean with hashed refs" do
+    with_tempdir do |dir|
+      root = copy_fixture("assets-site", dir)
+
+      build_fixture(root).assets.should eq(3)
+
+      config = Plombir::Config.load(root)
+      Plombir::Check::Runner.check(root, config).should be_empty
+    end
+  end
+
+  it "seo-site omits canonical without a url and check flags url and long title" do
+    with_tempdir do |dir|
+      root = copy_fixture("seo-site", dir)
+
+      build_fixture(root)
+
+      config = Plombir::Config.load(root)
+      issues = Plombir::Check::Runner.check(root, config)
+      seo = issues.select { |issue| issue.section == "SEO" }
+
+      issues.none?(&.error?).should be_true
+      seo.any? { |issue| issue.file == "plombir.yml" && issue.message.includes?("site.url is not set") }.should be_true
+      seo.any? { |issue| issue.file == "posts/long/index.html" && issue.message.includes?("over 60") }.should be_true
+    end
+  end
 end

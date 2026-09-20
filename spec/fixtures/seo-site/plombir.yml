@@ -1,0 +1,5 @@
+site:
+  title: SEO Fixture
+  description: A fixture for SEO fallbacks.
+build:
+  output: dist
