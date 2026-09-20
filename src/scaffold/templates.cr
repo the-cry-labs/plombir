@@ -100,24 +100,15 @@ module Plombir
 
       private def self.layout_post : String
         <<-HTML
-        <!DOCTYPE html>
-        <html lang="en">
-          <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-            {{ seo_head }}
-            <link rel="stylesheet" href="/assets/style.css">
-          </head>
-          <body>
-            <main>
-              <article>
-                <h1>{{ title }}</h1>
-                <p>{{ date }}</p>
-                {{ content }}
-              </article>
-            </main>
-          </body>
-        </html>
+        ---
+        layout: default
+        ---
+
+        <article>
+          <h1>{{ title }}</h1>
+          <p>{{ date }}</p>
+          {{ content }}
+        </article>
         HTML
       end
 
