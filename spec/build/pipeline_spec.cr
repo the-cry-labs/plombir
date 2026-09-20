@@ -238,6 +238,26 @@ describe Plombir::Build::Pipeline do
     end
   end
 
+  it "injects seo_head and site vars" do
+    with_tempdir do |dir|
+      root = write_site(dir, {
+        "content/index.md"     => "---\ntitle: Home\ndescription: Welcome.\n---\n\n# Home\n\nBody text here.\n",
+        "layouts/default.html" => "<head>{{ seo_head }}</head><body>{{ site.title }}:{{ content }}</body>\n",
+      })
+      site = Plombir::Config::Site.new("Blog", "Blurb", "https://x.example")
+      context = Plombir::Build::Context.new(root, site: site)
+
+      result = Plombir::Build::Pipeline.run(context)
+
+      result.warnings.should be_empty
+      html = File.read(File.join(root, "dist", "index.html"))
+      html.should contain("<title>Home | Blog</title>")
+      html.should contain(%(<meta name="description" content="Welcome.">))
+      html.should contain(%(<link rel="canonical" href="https://x.example/">))
+      html.should contain("Blog:")
+    end
+  end
+
   it "resolves asset_url through the render" do
     with_tempdir do |dir|
       root = write_site(dir, {
@@ -260,6 +280,91 @@ describe Plombir::Build::Pipeline do
       hash = Plombir::Assets::Fingerprint.hash8("body {}\n")
       html.should contain("href=\"/assets/style.#{hash}.css\"")
       missing.should be_empty
+    end
+  end
+
+  it "derives the description from the excerpt without frontmatter" do
+    with_tempdir do |dir|
+      root = write_site(dir, {
+        "content/index.md"     => "# Home\n\nA short paragraph about the homepage.\n",
+        "layouts/default.html" => "<head>{{ seo_head }}</head><body>{{ content }}</body>\n",
+      })
+
+      Plombir::Build::Pipeline.run(Plombir::Build::Context.new(root))
+
+      html = File.read(File.join(root, "dist", "index.html"))
+      html.should contain(%(<meta name="description" content="A short paragraph about the homepage.">))
+      html.should_not contain("canonical")
+    end
+  end
+
+  it "writes sitemap and robots from the route table" do
+    with_tempdir do |dir|
+      root = write_site(dir, {
+        "content/index.md"     => "---\ntitle: Home\ndate: 2026-09-13\n---\n\n# Home\n",
+        "content/posts/hi.md"  => "---\ntitle: Hi\ndate: 2026-09-10\n---\n\n# Hi\n",
+        "layouts/default.html" => "<main>{{ content }}</main>\n",
+      })
+      site = Plombir::Config::Site.new("Blog", "", "https://x.example")
+      context = Plombir::Build::Context.new(root, site: site)
+
+      Plombir::Build::Pipeline.run(context)
+
+      sitemap = File.read(File.join(root, "dist", "sitemap.xml"))
+      sitemap.should contain("<loc>https://x.example/</loc>")
+      sitemap.should contain("<loc>https://x.example/posts/hi/</loc>")
+      sitemap.should contain("<lastmod>2026-09-13</lastmod>")
+      File.read(File.join(root, "dist", "robots.txt")).should contain(
+        "Sitemap: https://x.example/sitemap.xml"
+      )
+    end
+  end
+
+  it "writes rss for posts and skips it without posts" do
+    with_tempdir do |dir|
+      root = write_site(dir, {
+        "content/index.md"     => "---\ntitle: Home\n---\n\n# Home\n",
+        "content/posts/hi.md"  => "---\ntitle: Hi\ndate: 2026-09-10\n---\n\n# Hi\n\nBody text.\n",
+        "layouts/default.html" => "<main>{{ content }}</main>\n",
+      })
+      site = Plombir::Config::Site.new("Blog", "Blurb", "https://x.example")
+
+      Plombir::Build::Pipeline.run(Plombir::Build::Context.new(root, site: site))
+
+      rss = File.read(File.join(root, "dist", "rss.xml"))
+      rss.should contain("<title>Blog</title>")
+      rss.should contain("<link>https://x.example/posts/hi/</link>")
+      rss.should contain("<pubDate>Thu, 10 Sep 2026 00:00:00 GMT</pubDate>")
+    end
+
+    with_tempdir do |dir|
+      root = write_site(dir, {
+        "content/index.md"     => "---\ntitle: Home\n---\n\n# Home\n",
+        "layouts/default.html" => "<main>{{ content }}</main>\n",
+      })
+
+      Plombir::Build::Pipeline.run(Plombir::Build::Context.new(root))
+
+      File.exists?(File.join(root, "dist", "rss.xml")).should be_false
+    end
+  end
+
+  it "minifies html only when asked" do
+    with_tempdir do |dir|
+      root = write_site(dir, {
+        "content/index.md"     => "# Home\n",
+        "layouts/default.html" => "<main>\n\n  <!-- note -->\n  {{ content }}\n\n</main>\n",
+      })
+
+      Plombir::Build::Pipeline.run(Plombir::Build::Context.new(root))
+      plain = File.read(File.join(root, "dist", "index.html"))
+      plain.should contain("<!-- note -->")
+
+      Plombir::Build::Pipeline.run(Plombir::Build::Context.new(root, "dist", false, minify: true))
+      minified = File.read(File.join(root, "dist", "index.html"))
+      minified.should_not contain("<!-- note -->")
+      minified.should_not contain("\n\n")
+      minified.should contain("<main>")
     end
   end
   describe ".collection_vars" do

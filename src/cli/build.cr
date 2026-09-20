@@ -1,11 +1,11 @@
 module Plombir
   module CLI
-    # Implements `plombir build [--output dist] [--drafts] [--strict]`.
+    # Implements `plombir build [--output dist] [--drafts] [--strict] [--minify]`.
     module Build
       def self.text : String
         String.build do |io|
           io << "Usage:\n"
-          io << "  plombir build [--output <dir>] [--drafts] [--strict]\n"
+          io << "  plombir build [--output <dir>] [--drafts] [--strict] [--minify]\n"
           io << "\n"
           io << "Build the site in the current directory into static HTML.\n"
           io << "\n"
@@ -13,6 +13,7 @@ module Plombir
           io << "  --output <dir>  Output directory (default: dist)\n"
           io << "  --drafts        Include drafts and _-prefixed pages\n"
           io << "  --strict        Fail on asset warnings (missing refs, public/ shadows)\n"
+          io << "  --minify        Collapse safe HTML whitespace (comments, blank lines)\n"
           io << "\n"
           io << "Example:\n"
           io << "  plombir build\n"
@@ -34,6 +35,7 @@ module Plombir
         output_flag = false
         drafts = false
         strict = false
+        minify = false
         rest = args.dup
         until rest.empty?
           case rest.first
@@ -42,6 +44,9 @@ module Plombir
             rest.shift
           when "--strict"
             strict = true
+            rest.shift
+          when "--minify"
+            minify = true
             rest.shift
           when "--output"
             rest.shift
@@ -64,7 +69,7 @@ module Plombir
 
         config = Plombir::Config.load_with_warnings(directory, error)
         output = config.build.output unless output_flag
-        context = Plombir::Build::Context.new(directory, output, drafts, config.schemas, config.permalink_patterns)
+        context = Plombir::Build::Context.new(directory, output, drafts, config.schemas, config.permalink_patterns, config.site, minify)
         result = Plombir::Build::Pipeline.run(context)
         if strict && !result.warnings.empty?
           error.puts "✖ Asset warnings (--strict)"

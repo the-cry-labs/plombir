@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>SEO Fixture</title><link>/</link><description>A fixture for SEO fallbacks.</description><item><title>Launch Day</title><link>/posts/launch/</link><pubDate>Thu, 10 Sep 2026 00:00:00 GMT</pubDate><description>We shipped the feed, the sitemap, and the head block.</description><content:encoded>&lt;h1&gt;Launch Day&lt;/h1&gt;
+&lt;p&gt;We shipped the feed, the sitemap, and the head block.&lt;/p&gt;
+</content:encoded></item><item><title>This title runs long on purpose to cross the sixty character line</title><link>/posts/long/</link><pubDate>Wed, 09 Sep 2026 00:00:00 GMT</pubDate><description>Search results will truncate this one.</description><content:encoded>&lt;h1&gt;Long Title&lt;/h1&gt;
+&lt;p&gt;Search results will truncate this one.&lt;/p&gt;
+</content:encoded></item></channel></rss>

@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>Untitled</title><link>/</link><description></description><item><title>Unrated</title><link>/posts/unrated/</link><pubDate>Thu, 02 Apr 2026 00:00:00 GMT</pubDate><description>Passes: rating is optional.</description><content:encoded>&lt;h1&gt;Unrated&lt;/h1&gt;
+&lt;p&gt;Passes: rating is optional.&lt;/p&gt;
+</content:encoded></item><item><title>Rated</title><link>/posts/rated/</link><pubDate>Wed, 01 Apr 2026 00:00:00 GMT</pubDate><description>Passes the schema.</description><content:encoded>&lt;h1&gt;Rated&lt;/h1&gt;
+&lt;p&gt;Passes the schema.&lt;/p&gt;
+</content:encoded></item></channel></rss>

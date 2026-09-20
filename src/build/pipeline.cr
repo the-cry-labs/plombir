@@ -20,15 +20,19 @@ module Plombir
     # Inputs for one build: site *root*, *output* directory (relative
     # to *root* unless absolute), whether *drafts* are included
     # (`plombir build --drafts`), optional per-collection schema rules
-    # (empty means no validation), and optional collection permalink
-    # patterns (empty means conventional URLs). The config loader fills
-    # all three from `plombir.yml`.
+    # (empty means no validation), optional collection permalink
+    # patterns (empty means conventional URLs), the *site* metadata
+    # (`site.*` vars, canonical base, feed identity), and whether
+    # *minify* collapses safe HTML whitespace. The config loader fills
+    # all of these from `plombir.yml`.
     struct Context
       getter root : String
       getter output : String
       getter drafts : Bool
       getter schemas : Hash(String, Content::Schema::CollectionRules)
       getter patterns : Hash(String, String)
+      getter site : Config::Site
+      getter minify : Bool
 
       def initialize(
         @root : String = Dir.current,
@@ -36,6 +40,8 @@ module Plombir
         @drafts : Bool = false,
         @schemas : Hash(String, Content::Schema::CollectionRules) = {} of String => Content::Schema::CollectionRules,
         @patterns : Hash(String, String) = {} of String => String,
+        @site : Config::Site = Config::Site.new,
+        @minify : Bool = false,
       )
       end
 
@@ -98,6 +104,7 @@ module Plombir
         assets = process_assets(context)
         warnings = assets.warnings.dup
         render_all(entries, routes, context, assets.files, warnings)
+        write_seo_files(entries, routes, context)
         copy_public(context)
 
         Result.new(routes.size, (Time.instant - started).total_milliseconds.to_i64, context.output, assets.files.size, warnings)
@@ -169,6 +176,7 @@ module Plombir
           missing.each do |reference|
             warnings << "#{entry.page.relative_path} references missing asset #{reference.inspect} — add it under assets/ (fingerprinted) or public/ (as-is)."
           end
+          html = Utils::Html.minify(html) if context.minify
           destination = File.join(context.output_dir, route.output_path)
           Dir.mkdir_p(File.dirname(destination))
           File.write(destination, html)
@@ -229,6 +237,10 @@ module Plombir
         vars["date"] = format_date(entry.document.date(entry.page.mtime))
         vars["tags"] = entry.document.tags
         vars["url"] = route.url
+        vars["site.title"] = context.site.title
+        vars["site.description"] = context.site.description
+        vars["site.url"] = context.site.url
+        vars["seo_head"] = seo_head(entry, route, slug, context.site, assets)
         collections.each { |key, value| vars[key] = value }
         rendered = Renderer::Page.render_file(body, entry.document.layout, context.layouts_dir, vars, entry.page.relative_path, nil, partials, components, assets)
         rewritten = Assets::Rewrite.rewrite(rendered, assets, context.public_dir)
@@ -236,14 +248,81 @@ module Plombir
         rewritten.html
       end
 
+      # Builds the `{{ seo_head }}` block from frontmatter (title,
+      # description, image), the excerpt fallback, and the site
+      # metadata — the same values as the `site.*` template vars. The
+      # image resolves through *manifest* first, so fingerprinted
+      # images keep working in `og:image`.
+      private def self.seo_head(entry : Entry, route : Router::Route, slug : String, site : Config::Site, manifest : Hash(String, String)) : String
+        image = entry.document.string?("image").try(&.strip)
+        image = nil if image.try(&.empty?)
+        image = Assets::Rewrite.asset_url(image, manifest) if image
+        Seo::Head.build(
+          title: entry.document.title(slug),
+          description: entry.document.string?("description") || "",
+          excerpt: Content::Document.excerpt(entry.document),
+          image: image,
+          date: entry.document.date(entry.page.mtime),
+          collection: Content::Collection.collection_name(entry.page.relative_path),
+          url: route.url,
+          site: site
+        )
+      end
+
       private def self.format_date(date : Time?) : String
         date ? date.to_s("%Y-%m-%d") : ""
       end
 
+      # Writes `sitemap.xml`, `robots.txt`, and `rss.xml` (the last
+      # only when `posts` has entries). Root files by design, so a
+      # matching `public/` file cleanly overrides them later — the
+      # documented seam for staging rules and hand-written maps.
+      private def self.write_seo_files(entries : Array(Entry), routes : Hash(String, Router::Route), context : Context) : Nil
+        pages = entries.map do |entry|
+          route = routes[entry.page.relative_path]
+          date = entry.document.date(entry.page.mtime)
+          Seo::Sitemap::Page.new(route.url, date.try(&.to_s("%Y-%m-%d")))
+        end
+        Seo::Sitemap.write(context.output_dir, pages, context.site.url)
+        Seo::Robots.write(context.output_dir, context.site.url)
+        items = feed_items(entries, routes)
+        Feeds::Rss.write(context.output_dir, items, context.site) unless items.empty?
+      end
+
+      # `posts` entries newest-first (same ordering as
+      # `collection_vars`: dated first, most recent first, ties by
+      # path), capped at `Feeds::Rss::LIMIT`, with rendered bodies for
+      # `content:encoded`.
+      private def self.feed_items(entries : Array(Entry), routes : Hash(String, Router::Route)) : Array(Feeds::Rss::Item)
+        posts = entries.select do |entry|
+          Content::Collection.collection_name(entry.page.relative_path) == Feeds::Rss::COLLECTION
+        end
+        posts.sort! do |a, b|
+          date_a = a.document.date(a.page.mtime)
+          date_b = b.document.date(b.page.mtime)
+          dated = (date_a.nil? ? 1 : 0) <=> (date_b.nil? ? 1 : 0)
+          next dated unless dated == 0
+          recent = (date_b.try(&.to_unix) || 0_i64) <=> (date_a.try(&.to_unix) || 0_i64)
+          next recent unless recent == 0
+          a.page.relative_path <=> b.page.relative_path
+        end
+        posts.first(Feeds::Rss::LIMIT).map do |entry|
+          slug = Router.slugify(File.basename(entry.page.relative_path, ".md"))
+          Feeds::Rss::Item.new(
+            entry.document.title(slug),
+            routes[entry.page.relative_path].url,
+            entry.document.date(entry.page.mtime),
+            Content::Document.excerpt(entry.document),
+            Markdown.render(entry.document.body)
+          )
+        end
+      end
+
       # Fingerprints `assets/` into the output directory and writes
-      # the manifest. Runs after rendering (so it lands inside the
-      # fresh output dir) and before `copy_public` (so `public/` wins
-      # collisions, with a warning carried on the `Result`).
+      # the manifest. Runs before rendering so `| asset_url` and the
+      # rewrite pass resolve against it, and before `copy_public` so
+      # `public/` wins collisions (with a warning carried on the
+      # `Result`).
       def self.process_assets(context : Context) : Assets::Pipeline::Result
         Assets::Pipeline.run(context.root, context.output_dir)
       end

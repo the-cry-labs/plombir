@@ -86,8 +86,7 @@ module Plombir
           <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
-            <title>{{ title }}</title>
-            <meta name="description" content="{{ description }}">
+            {{ seo_head }}
             <link rel="stylesheet" href="/assets/style.css">
           </head>
           <body>
@@ -106,8 +105,7 @@ module Plombir
           <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
-            <title>{{ title }}</title>
-            <meta name="description" content="{{ description }}">
+            {{ seo_head }}
             <link rel="stylesheet" href="/assets/style.css">
           </head>
           <body>

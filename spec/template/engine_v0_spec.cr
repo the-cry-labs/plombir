@@ -181,6 +181,12 @@ describe Plombir::Template::EngineV0 do
     Plombir::Template::EngineV0.render("{{ content | strip_html }}", context).should eq("a&b")
   end
 
+  it "leaves seo_head raw" do
+    context = {"seo_head" => "<title>Hi</title>"} of String => Plombir::Template::EngineV0::Value
+
+    Plombir::Template::EngineV0.render("{{ seo_head }}", context).should eq("<title>Hi</title>")
+  end
+
   it "slugifies titles" do
     context = {"title" => "Hello, World!"} of String => Plombir::Template::EngineV0::Value
 

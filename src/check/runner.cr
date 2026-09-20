@@ -22,11 +22,11 @@ module Plombir
         tmp = File.join(Dir.tempdir, "plombir-check-#{Random::Secure.hex(8)}")
         Dir.mkdir_p(tmp)
         begin
-          context = Build::Context.new(root, tmp, false, config.schemas, config.permalink_patterns)
+          context = Build::Context.new(root, tmp, false, config.schemas, config.permalink_patterns, config.site)
           Build::Pipeline.run(context)
           issues.concat(LinksCheck.check(tmp))
           issues.concat(AssetsCheck.check(tmp))
-          issues.concat(SeoCheck.check(tmp))
+          issues.concat(SeoCheck.check(tmp, config.site.url))
         rescue ex : Build::Error | Frontmatter::Error | Router::Conflict | Renderer::LayoutNotFound
           issues << Issue.new(Severity::Error, "Content", "<build>", "Build failed during check: #{ex.message}", "Fix the error above and rerun `plombir check`.")
         ensure

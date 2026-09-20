@@ -1,0 +1,6 @@
+site:
+  title: Asset Fixture
+  description: A fixture for the asset pipeline.
+  url: https://assets.example.com
+build:
+  output: dist
