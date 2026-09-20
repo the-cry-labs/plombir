@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>Test Blog</title><link>https://blog.example.com/</link><description>A fixture blog</description><item><title>Post 11</title><link>https://blog.example.com/blog/2026/post-11/</link><pubDate>Sun, 11 Jan 2026 00:00:00 GMT</pubDate><description>Body text for post 11 with enough words to exercise the fallback excerpt path of the content model.</description><content:encoded>&lt;h1&gt;Post 11&lt;/h1&gt;
+&lt;p&gt;Body text for post 11 with enough words to exercise the fallback excerpt path of the content model.&lt;/p&gt;
+</content:encoded></item><item><title>Post 10</title><link>https://blog.example.com/blog/2026/post-10/</link><pubDate>Sat, 10 Jan 2026 00:00:00 GMT</pubDate><description>Body text for post 10 with enough words to exercise the fallback excerpt path of the content model.</description><content:encoded>&lt;h1&gt;Post 10&lt;/h1&gt;
+&lt;p&gt;Body text for post 10 with enough words to exercise the fallback excerpt path of the content model.&lt;/p&gt;
+</content:encoded></item><item><title>Post 09</title><link>https://blog.example.com/blog/2026/post-09/</link><pubDate>Fri, 09 Jan 2026 00:00:00 GMT</pubDate><description>Body text for post 09 with enough words to exercise the fallback excerpt path of the content model.</description><content:encoded>&lt;h1&gt;Post 09&lt;/h1&gt;
+&lt;p&gt;Body text for post 09 with enough words to exercise the fallback excerpt path of the content model.&lt;/p&gt;
+</content:encoded></item><item><title>Post 08</title><link>https://blog.example.com/blog/2026/post-08/</link><pubDate>Thu, 08 Jan 2026 00:00:00 GMT</pubDate><description>Body text for post 08 with enough words to exercise the fallback excerpt path of the content model.</description><content:encoded>&lt;h1&gt;Post 08&lt;/h1&gt;
+&lt;p&gt;Body text for post 08 with enough words to exercise the fallback excerpt path of the content model.&lt;/p&gt;
+</content:encoded></item><item><title>Post 06</title><link>https://blog.example.com/blog/2026/post-06/</link><pubDate>Tue, 06 Jan 2026 00:00:00 GMT</pubDate><description>Body text for post 06 with enough words to exercise the fallback excerpt path of the content model.</description><content:encoded>&lt;h1&gt;Post 06&lt;/h1&gt;
+&lt;p&gt;Body text for post 06 with enough words to exercise the fallback excerpt path of the content model.&lt;/p&gt;
+</content:encoded></item><item><title>Post 05</title><link>https://blog.example.com/blog/2026/post-05/</link><pubDate>Mon, 05 Jan 2026 00:00:00 GMT</pubDate><description>Body text for post 05 with enough words to exercise the fallback excerpt path of the content model.</description><content:encoded>&lt;h1&gt;Post 05&lt;/h1&gt;
+&lt;p&gt;Body text for post 05 with enough words to exercise the fallback excerpt path of the content model.&lt;/p&gt;
+</content:encoded></item><item><title>Post 04</title><link>https://blog.example.com/blog/2026/post-04/</link><pubDate>Sun, 04 Jan 2026 00:00:00 GMT</pubDate><description>Body text for post 04 with enough words to exercise the fallback excerpt path of the content model.</description><content:encoded>&lt;h1&gt;Post 04&lt;/h1&gt;
+&lt;p&gt;Body text for post 04 with enough words to exercise the fallback excerpt path of the content model.&lt;/p&gt;
+</content:encoded></item><item><title>Post 03</title><link>https://blog.example.com/blog/2026/post-03/</link><pubDate>Sat, 03 Jan 2026 00:00:00 GMT</pubDate><description>Body text for post 03 with enough words to exercise the fallback excerpt path of the content model.</description><content:encoded>&lt;h1&gt;Post 03&lt;/h1&gt;
+&lt;p&gt;Body text for post 03 with enough words to exercise the fallback excerpt path of the content model.&lt;/p&gt;
+</content:encoded></item><item><title>Post 02</title><link>https://blog.example.com/blog/2026/post-02/</link><pubDate>Fri, 02 Jan 2026 00:00:00 GMT</pubDate><description>Teaser two.</description><content:encoded>&lt;h1&gt;Post 02&lt;/h1&gt;
+&lt;p&gt;Teaser two.&lt;/p&gt;
+&lt;p&gt;&amp;lt;!--more--&amp;gt;&lt;/p&gt;
+&lt;p&gt;The rest of post two that never appears in listings.&lt;/p&gt;
+</content:encoded></item><item><title>Post 01</title><link>https://blog.example.com/blog/2026/post-01/</link><pubDate>Thu, 01 Jan 2026 00:00:00 GMT</pubDate><description>Custom teaser one.</description><content:encoded>&lt;h1&gt;Post 01&lt;/h1&gt;
+&lt;p&gt;Body text for post one.&lt;/p&gt;
+</content:encoded></item></channel></rss>
