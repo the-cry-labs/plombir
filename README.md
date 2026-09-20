@@ -70,6 +70,11 @@ on Crystal `1.21` and `latest`.
 - `docs/project-structure.md` — generated tree and conventions.
 - `docs/cli.md` — every command, flag, and exit code.
 - `docs/content.md` — collections, frontmatter, permalinks, schemas, `check`.
+- `docs/markdown.md` — supported Markdown subset.
+- `docs/layouts.md` — layouts, inheritance, includes, components.
+- `docs/config.md` — every `plombir.yml` key and default.
+- `docs/deployment.md` — ship `dist/` to any static host.
+- `docs/troubleshooting.md` — every common error and its fix.
 - `docs/templates.md` — template language, filters, components, error gallery.
 - `docs/assets.md` — `assets/` vs `public/`, fingerprinting.
 - `docs/seo.md` — meta tags, sitemap, feeds.
