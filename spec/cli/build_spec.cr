@@ -28,6 +28,7 @@ describe Plombir::CLI::Build do
     io.to_s.should contain("plombir build")
     io.to_s.should contain("--drafts")
     io.to_s.should contain("--strict")
+    io.to_s.should contain("--minify")
   end
 
   it "writes to a custom output directory" do

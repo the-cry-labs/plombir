@@ -5,6 +5,7 @@
 require "yaml"
 require "json"
 require "./utils/slug"
+require "./utils/html"
 require "./content/loader"
 require "./content/document"
 require "./content/collection"

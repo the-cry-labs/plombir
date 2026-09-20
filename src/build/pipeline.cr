@@ -176,6 +176,7 @@ module Plombir
           missing.each do |reference|
             warnings << "#{entry.page.relative_path} references missing asset #{reference.inspect} — add it under assets/ (fingerprinted) or public/ (as-is)."
           end
+          html = Utils::Html.minify(html) if context.minify
           destination = File.join(context.output_dir, route.output_path)
           Dir.mkdir_p(File.dirname(destination))
           File.write(destination, html)
@@ -239,7 +240,7 @@ module Plombir
         vars["site.title"] = context.site.title
         vars["site.description"] = context.site.description
         vars["site.url"] = context.site.url
-        vars["seo_head"] = seo_head(entry, route, slug, context.site)
+        vars["seo_head"] = seo_head(entry, route, slug, context.site, assets)
         collections.each { |key, value| vars[key] = value }
         rendered = Renderer::Page.render_file(body, entry.document.layout, context.layouts_dir, vars, entry.page.relative_path, nil, partials, components, assets)
         rewritten = Assets::Rewrite.rewrite(rendered, assets, context.public_dir)
@@ -249,10 +250,13 @@ module Plombir
 
       # Builds the `{{ seo_head }}` block from frontmatter (title,
       # description, image), the excerpt fallback, and the site
-      # metadata — the same values as the `site.*` template vars.
-      private def self.seo_head(entry : Entry, route : Router::Route, slug : String, site : Config::Site) : String
+      # metadata — the same values as the `site.*` template vars. The
+      # image resolves through *manifest* first, so fingerprinted
+      # images keep working in `og:image`.
+      private def self.seo_head(entry : Entry, route : Router::Route, slug : String, site : Config::Site, manifest : Hash(String, String)) : String
         image = entry.document.string?("image").try(&.strip)
         image = nil if image.try(&.empty?)
+        image = Assets::Rewrite.asset_url(image, manifest) if image
         Seo::Head.build(
           title: entry.document.title(slug),
           description: entry.document.string?("description") || "",

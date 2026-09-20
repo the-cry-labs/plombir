@@ -348,6 +348,25 @@ describe Plombir::Build::Pipeline do
       File.exists?(File.join(root, "dist", "rss.xml")).should be_false
     end
   end
+
+  it "minifies html only when asked" do
+    with_tempdir do |dir|
+      root = write_site(dir, {
+        "content/index.md"     => "# Home\n",
+        "layouts/default.html" => "<main>\n\n  <!-- note -->\n  {{ content }}\n\n</main>\n",
+      })
+
+      Plombir::Build::Pipeline.run(Plombir::Build::Context.new(root))
+      plain = File.read(File.join(root, "dist", "index.html"))
+      plain.should contain("<!-- note -->")
+
+      Plombir::Build::Pipeline.run(Plombir::Build::Context.new(root, "dist", false, minify: true))
+      minified = File.read(File.join(root, "dist", "index.html"))
+      minified.should_not contain("<!-- note -->")
+      minified.should_not contain("\n\n")
+      minified.should contain("<main>")
+    end
+  end
   describe ".collection_vars" do
     it "exposes collections newest-first by effective date" do
       with_tempdir do |dir|
