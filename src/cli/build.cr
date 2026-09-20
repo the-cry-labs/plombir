@@ -1,17 +1,18 @@
 module Plombir
   module CLI
-    # Implements `plombir build [--output dist] [--drafts]`.
+    # Implements `plombir build [--output dist] [--drafts] [--strict]`.
     module Build
       def self.text : String
         String.build do |io|
           io << "Usage:\n"
-          io << "  plombir build [--output <dir>] [--drafts]\n"
+          io << "  plombir build [--output <dir>] [--drafts] [--strict]\n"
           io << "\n"
           io << "Build the site in the current directory into static HTML.\n"
           io << "\n"
           io << "Options:\n"
           io << "  --output <dir>  Output directory (default: dist)\n"
           io << "  --drafts        Include drafts and _-prefixed pages\n"
+          io << "  --strict        Fail on asset warnings (missing refs, public/ shadows)\n"
           io << "\n"
           io << "Example:\n"
           io << "  plombir build\n"
@@ -32,11 +33,15 @@ module Plombir
         output = "dist"
         output_flag = false
         drafts = false
+        strict = false
         rest = args.dup
         until rest.empty?
           case rest.first
           when "--drafts"
             drafts = true
+            rest.shift
+          when "--strict"
+            strict = true
             rest.shift
           when "--output"
             rest.shift
@@ -61,6 +66,14 @@ module Plombir
         output = config.build.output unless output_flag
         context = Plombir::Build::Context.new(directory, output, drafts, config.schemas, config.permalink_patterns)
         result = Plombir::Build::Pipeline.run(context)
+        if strict && !result.warnings.empty?
+          error.puts "✖ Asset warnings (--strict)"
+          error.puts ""
+          result.warnings.each { |warning| error.puts "! #{warning}" }
+          error.puts ""
+          error.puts "Fix the assets above and rebuild."
+          return 1
+        end
         result.warnings.each { |warning| error.puts "! #{warning}" }
         print_summary(result, io)
         0

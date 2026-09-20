@@ -237,14 +237,15 @@ module Plombir
 
         # Checks a filter's literal argument: `truncate` requires a
         # non-negative count, value filters (`escape`, `strip_html`,
-        # `slugify`, `jsonify`) take none, `date` accepts any format.
+        # `slugify`, `jsonify`, `asset_url`) take none, `date` accepts
+        # any format.
         private def validate_filter_arg(name : String, arg : String?, token : Lexer::Token) : Nil
           case name
           when "truncate"
             unless !arg.nil? && arg.matches?(/\A\d+\z/) && !arg.to_i?(whitespace: false).nil?
               fail(token.line, token.column, Errors.filter_arg_message(@file, token.line, token.column, name))
             end
-          when "escape", "strip_html", "slugify", "jsonify"
+          when "escape", "strip_html", "slugify", "jsonify", "asset_url"
             unless arg.nil?
               fail(token.line, token.column, Errors.filter_arg_message(@file, token.line, token.column, name))
             end

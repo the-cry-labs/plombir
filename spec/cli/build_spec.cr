@@ -27,6 +27,7 @@ describe Plombir::CLI::Build do
     code.should eq(0)
     io.to_s.should contain("plombir build")
     io.to_s.should contain("--drafts")
+    io.to_s.should contain("--strict")
   end
 
   it "writes to a custom output directory" do
@@ -69,6 +70,38 @@ describe Plombir::CLI::Build do
       code.should eq(1)
       error.to_s.should contain("✖ Invalid frontmatter")
       error.to_s.should_not contain("Backtrace")
+    end
+  end
+
+  describe "--strict" do
+    it "fails asset warnings with exit 1" do
+      with_tempdir do |dir|
+        root = Plombir::Scaffold::Site.new("site", dir).create
+        File.write(
+          File.join(root, "content", "posts", "hello-world.md"),
+          "---\ntitle: Hi\nlayout: post\n---\n\n# Hi\n\n![ghost](/assets/ghost.png)\n"
+        )
+        error = IO::Memory.new
+
+        code = Plombir::CLI::Build.call(["--strict"], root, IO::Memory.new, error)
+
+        code.should eq(1)
+        error.to_s.should contain("✖ Asset warnings (--strict)")
+        error.to_s.should contain(%(references missing asset "/assets/ghost.png"))
+      end
+    end
+
+    it "passes a clean site with exit 0" do
+      with_tempdir do |dir|
+        root = Plombir::Scaffold::Site.new("site", dir).create
+        io = IO::Memory.new
+        error = IO::Memory.new
+
+        code = Plombir::CLI::Build.call(["--strict"], root, io, error)
+
+        code.should eq(0)
+        io.to_s.should contain("✓ Processed 0 assets")
+      end
     end
   end
 

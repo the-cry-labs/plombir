@@ -31,7 +31,7 @@ module Plombir
 
       # Filters the engine applies in `{{ }}`. Shared by the
       # unknown-filter diagnostic and its hint, like `TAG_NAMES`.
-      FILTER_NAMES = ["escape", "strip_html", "truncate", "date", "slugify", "jsonify"]
+      FILTER_NAMES = ["escape", "strip_html", "truncate", "date", "slugify", "jsonify", "asset_url"]
 
       # Raises an `Error` for *file* at *line*:*column*, appending the
       # offending source line from *lines* (the template split on

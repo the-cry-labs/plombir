@@ -267,9 +267,11 @@ describe Plombir::Template::Parser do
   end
 
   it "rejects args on value filters" do
-    ex = parse_error("{{ x | escape: y }}")
+    escape = parse_error("{{ x | escape: y }}")
+    escape.message.to_s.should contain("takes no argument")
 
-    ex.message.to_s.should contain("takes no argument")
+    asset_url = parse_error("{{ x | asset_url: y }}")
+    asset_url.message.to_s.should contain("takes no argument")
   end
 
   it "rejects bad variable names" do

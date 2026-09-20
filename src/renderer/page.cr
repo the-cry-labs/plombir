@@ -27,12 +27,13 @@ module Plombir
       #
       # *vars* holds page fields (`title`, `description`, `date`, …) and any
       # `site.*` keys. Every top-level key is also visible as `page.<key>`,
-      # and `content` / `page.content` always hold *body_html*.
+      # and `content` / `page.content` always hold *body_html*. *assets*
+      # is the fingerprinted-asset manifest for `| asset_url`.
       #
       # ```
       # Page.render("<p>Hi.</p>", "<h1>{{ title }}</h1>{{ content }}", {"title" => "Hi"})
       # ```
-      def self.render(body_html : String, layout_source : String, vars : Context, file : String = "<input>", includes : Partials = Partials.new, components : Components = Components.new) : String
+      def self.render(body_html : String, layout_source : String, vars : Context, file : String = "<input>", includes : Partials = Partials.new, components : Components = Components.new, assets : Hash(String, String) = {} of String => String) : String
         context = Context.new
         vars.each { |key, value| context[key] = value }
         vars.each do |key, value|
@@ -41,7 +42,7 @@ module Plombir
         end
         context["content"] = body_html
         context["page.content"] = body_html
-        Template::EngineV0.render(layout_source, context, file, includes, components)
+        Template::EngineV0.render(layout_source, context, file, includes, components, assets)
       end
 
       # Loads `layouts/<layout_name>.html` from *layouts_dir* and renders it.
@@ -62,6 +63,7 @@ module Plombir
         line : Int32? = nil,
         partials : Partials? = nil,
         components : Components? = nil,
+        assets : Hash(String, String) = {} of String => String,
       ) : String
         render_chain(
           body_html,
@@ -72,7 +74,8 @@ module Plombir
           vars,
           file,
           line,
-          [layout_name]
+          [layout_name],
+          assets
         )
       end
 
@@ -124,6 +127,7 @@ module Plombir
         file : String,
         line : Int32?,
         chain : Array(String),
+        assets : Hash(String, String),
       ) : String
         if chain.size > MAX_CHAIN_DEPTH
           raise LayoutChainTooDeep.new(file, chain)
@@ -133,10 +137,10 @@ module Plombir
           raise LayoutNotFound.new(file, line, layout_name, available_layouts(layouts_dir))
         end
         document = Frontmatter.parse(File.read(path), path)
-        inner = render(body_html, document.body, vars, file, includes, components)
+        inner = render(body_html, document.body, vars, file, includes, components, assets)
         parent = document.string?("layout").try(&.strip) || ""
         return inner if parent.empty?
-        render_chain(inner, parent, layouts_dir, includes, components, vars, file, line, chain + [parent])
+        render_chain(inner, parent, layouts_dir, includes, components, vars, file, line, chain + [parent], assets)
       end
 
       # Returns sorted layout names (`default`, `post`, …) for *layouts_dir*.

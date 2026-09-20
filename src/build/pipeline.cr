@@ -94,11 +94,13 @@ module Plombir
         entries = discover(context)
         validate_schemas!(context, entries)
         routes = resolve(entries, context.patterns)
-        render_all(entries, routes, context)
+        prepare_output(context)
         assets = process_assets(context)
+        warnings = assets.warnings.dup
+        render_all(entries, routes, context, assets.files, warnings)
         copy_public(context)
 
-        Result.new(routes.size, (Time.instant - started).total_milliseconds.to_i64, context.output, assets.files.size, assets.warnings)
+        Result.new(routes.size, (Time.instant - started).total_milliseconds.to_i64, context.output, assets.files.size, warnings)
       end
 
       # Validates frontmatter against the context schemas, printing
@@ -138,22 +140,38 @@ module Plombir
         end)
       end
 
-      # Renders every entry into a fresh output directory.
+      # Wipes and recreates the output directory. Runs before any stage
+      # writes, so fingerprinting, rendering, and `public/` all land in
+      # a fresh tree.
+      private def self.prepare_output(context : Context) : Nil
+        FileUtils.rm_rf(context.output_dir)
+        Dir.mkdir_p(context.output_dir)
+      end
+
+      # Renders every entry into the prepared output directory,
+      # rewriting `/assets/…` references through *manifest*. References
+      # backed by neither `assets/` nor `public/` append a warning
+      # naming the content file.
       private def self.render_all(
         entries : Array(Entry),
         routes : Hash(String, Router::Route),
         context : Context,
+        manifest : Hash(String, String),
+        warnings : Array(String),
       ) : Nil
-        FileUtils.rm_rf(context.output_dir)
-        Dir.mkdir_p(context.output_dir)
         collections = collection_vars(entries, routes)
         partials = Renderer::Page.partial_sources(context.layouts_dir)
         components = Renderer::Page.component_sources(context.components_dir)
         entries.each do |entry|
           route = routes[entry.page.relative_path]
+          missing = [] of String
+          html = render_one(entry, route, context, collections, partials, components, manifest, missing)
+          missing.each do |reference|
+            warnings << "#{entry.page.relative_path} references missing asset #{reference.inspect} — add it under assets/ (fingerprinted) or public/ (as-is)."
+          end
           destination = File.join(context.output_dir, route.output_path)
           Dir.mkdir_p(File.dirname(destination))
-          File.write(destination, render_one(entry, route, context, collections, partials, components))
+          File.write(destination, html)
         end
       end
 
@@ -198,8 +216,11 @@ module Plombir
       # defaults to empty so single-page callers stay simple.
       # *partials* and *components* default to loading from the
       # context directories on demand; the full pipeline passes
-      # prebuilt maps instead.
-      def self.render_one(entry : Entry, route : Router::Route, context : Context, collections : Hash(String, Renderer::Page::Value) = {} of String => Renderer::Page::Value, partials : Renderer::Page::Partials? = nil, components : Renderer::Page::Components? = nil) : String
+      # prebuilt maps instead. *assets* is the fingerprinted-asset
+      # manifest for `| asset_url` and the `/assets/…` rewrite; refs
+      # backed by neither `assets/` nor `public/` are collected into
+      # *missing* for the caller to warn about.
+      def self.render_one(entry : Entry, route : Router::Route, context : Context, collections : Hash(String, Renderer::Page::Value) = {} of String => Renderer::Page::Value, partials : Renderer::Page::Partials? = nil, components : Renderer::Page::Components? = nil, assets : Hash(String, String) = {} of String => String, missing : Array(String) = [] of String) : String
         body = Markdown.render(entry.document.body)
         vars = Renderer::Page::Context.new
         slug = Router.slugify(File.basename(entry.page.relative_path, ".md"))
@@ -209,7 +230,10 @@ module Plombir
         vars["tags"] = entry.document.tags
         vars["url"] = route.url
         collections.each { |key, value| vars[key] = value }
-        Renderer::Page.render_file(body, entry.document.layout, context.layouts_dir, vars, entry.page.relative_path, nil, partials, components)
+        rendered = Renderer::Page.render_file(body, entry.document.layout, context.layouts_dir, vars, entry.page.relative_path, nil, partials, components, assets)
+        rewritten = Assets::Rewrite.rewrite(rendered, assets, context.public_dir)
+        missing.concat(rewritten.missing)
+        rewritten.html
       end
 
       private def self.format_date(date : Time?) : String

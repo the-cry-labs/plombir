@@ -183,6 +183,85 @@ describe Plombir::Build::Pipeline do
       ex.message.to_s.should contain("✖ Invalid output directory")
     end
   end
+
+  it "rewrites fingerprinted refs in dist html" do
+    with_tempdir do |dir|
+      root = write_site(dir, {
+        "content/index.md"     => "# Home\n",
+        "layouts/default.html" => "<html><head><link rel=\"stylesheet\" href=\"/assets/style.css\"></head><body>{{ content }}</body></html>\n",
+        "assets/style.css"     => "body { color: red; }\n",
+      })
+
+      result = Plombir::Build::Pipeline.run(Plombir::Build::Context.new(root))
+
+      result.warnings.should be_empty
+      hash = Plombir::Assets::Fingerprint.hash8("body { color: red; }\n")
+      File.read(File.join(root, "dist", "index.html")).should contain(
+        "href=\"/assets/style.#{hash}.css\""
+      )
+    end
+  end
+
+  it "warns on missing asset refs with the content file" do
+    with_tempdir do |dir|
+      root = write_site(dir, {
+        "content/posts/hello.md" => "# Hi\n\n![ghost](/assets/ghost.png)\n",
+        "layouts/default.html"   => "<main>{{ content }}</main>\n",
+      })
+
+      result = Plombir::Build::Pipeline.run(Plombir::Build::Context.new(root))
+
+      result.warnings.size.should eq(1)
+      result.warnings.first.should contain("posts/hello.md")
+      result.warnings.first.should contain(%(references missing asset "/assets/ghost.png"))
+      File.read(File.join(root, "dist", "posts", "hello", "index.html")).should contain(
+        %(src="/assets/ghost.png")
+      )
+    end
+  end
+
+  it "leaves public-backed refs silent" do
+    with_tempdir do |dir|
+      root = write_site(dir, {
+        "content/index.md"       => "# Home\n",
+        "layouts/default.html"   => "<main>{{ content }}</main>\n",
+        "public/assets/logo.png" => "fake-png",
+        "content/posts/hello.md" => "# Hi\n\n![logo](/assets/logo.png)\n",
+      })
+
+      result = Plombir::Build::Pipeline.run(Plombir::Build::Context.new(root))
+
+      result.warnings.should be_empty
+      File.read(File.join(root, "dist", "posts", "hello", "index.html")).should contain(
+        %(src="/assets/logo.png")
+      )
+    end
+  end
+
+  it "resolves asset_url through the render" do
+    with_tempdir do |dir|
+      root = write_site(dir, {
+        "content/index.md"     => "---\ntitle: style.css\n---\n\n# Home\n",
+        "layouts/default.html" => "<link href=\"{{ title | asset_url }}\">\n",
+        "assets/style.css"     => "body {}\n",
+      })
+      context = Plombir::Build::Context.new(root)
+      entries = Plombir::Build::Pipeline.discover(context)
+      routes = Plombir::Build::Pipeline.resolve(entries)
+      assets = Plombir::Assets::Pipeline.run(root, File.join(root, "dist"))
+      missing = [] of String
+
+      html = Plombir::Build::Pipeline.render_one(
+        entries.first, routes[entries.first.page.relative_path], context,
+        Plombir::Build::Pipeline.collection_vars(entries, routes),
+        nil, nil, assets.files, missing
+      )
+
+      hash = Plombir::Assets::Fingerprint.hash8("body {}\n")
+      html.should contain("href=\"/assets/style.#{hash}.css\"")
+      missing.should be_empty
+    end
+  end
   describe ".collection_vars" do
     it "exposes collections newest-first by effective date" do
       with_tempdir do |dir|
