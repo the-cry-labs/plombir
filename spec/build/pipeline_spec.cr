@@ -130,6 +130,59 @@ describe Plombir::Build::Pipeline do
       Dir.exists?(File.join(dir, "dist")).should be_true
     end
   end
+
+  it "fingerprints assets with a manifest and counts them" do
+    with_tempdir do |dir|
+      root = write_site(dir, {
+        "content/index.md"     => "# Home\n",
+        "layouts/default.html" => "<main>{{ content }}</main>\n",
+        "assets/style.css"     => "body { color: red; }\n",
+      })
+
+      result = Plombir::Build::Pipeline.run(Plombir::Build::Context.new(root))
+
+      hash = Plombir::Assets::Fingerprint.hash8("body { color: red; }\n")
+      result.assets.should eq(1)
+      File.read(File.join(root, "dist", "assets", "style.#{hash}.css")).should eq("body { color: red; }\n")
+      Plombir::Assets::Manifest.read(File.join(root, "dist")).should eq(
+        {"style.css" => "assets/style.#{hash}.css"}
+      )
+    end
+  end
+
+  it "lets public/ win over fingerprinted assets with a warning" do
+    with_tempdir do |dir|
+      css = "body {}\n"
+      hash = Plombir::Assets::Fingerprint.hash8(css)
+      root = write_site(dir, {
+        "content/index.md"                => "# Home\n",
+        "layouts/default.html"            => "<main>{{ content }}</main>\n",
+        "assets/style.css"                => css,
+        "public/assets/style.#{hash}.css" => "from public\n",
+      })
+
+      result = Plombir::Build::Pipeline.run(Plombir::Build::Context.new(root))
+
+      result.warnings.size.should eq(1)
+      result.warnings.first.should contain("public/ wins")
+      File.read(File.join(root, "dist", "assets", "style.#{hash}.css")).should eq("from public\n")
+    end
+  end
+
+  it "refuses an assets directory as the output" do
+    with_tempdir do |dir|
+      root = write_site(dir, {
+        "content/index.md"     => "# Home\n",
+        "layouts/default.html" => "{{ content }}\n",
+      })
+
+      ex = expect_raises(Plombir::Build::Error) do
+        Plombir::Build::Pipeline.run(Plombir::Build::Context.new(root, "assets"))
+      end
+
+      ex.message.to_s.should contain("✖ Invalid output directory")
+    end
+  end
   describe ".collection_vars" do
     it "exposes collections newest-first by effective date" do
       with_tempdir do |dir|

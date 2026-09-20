@@ -33,16 +33,14 @@ Brand reminder (§34): modern, sharp, minimal, premium developer tool. Subtle pl
 
 ---
 
-## 1. Current state — Phase 4 at its exit gate (`templates` v1 done, pending tag)
+## 1. Current state — Phase 5 active (`templates` v1 tagged)
 
-Phase 3 is done and tagged (`v0.4.0-content`). Phase 4 items 1–6 are
-implemented: positioned lexer → parser → AST → renderer, errors with
-`file:line:col` plus closest-name hints, `elsif` + `limit:`/`offset:`
-windows, `include` partials, six filters, isolated components, nesting
-guards, `docs/templates.md` with a verified error gallery, syntax
-freeze (ADR-005), and the 1k-render bench (140ms, budget 500ms).
-Remaining for the exit gate: merge the template stack and tag
-`v0.5.0-templates`.
+Phase 4 is done and tagged (`v0.5.0-templates`): positioned lexer
+→ parser → AST → renderer, errors with `file:line:col` plus
+closest-name hints, `elsif` + `limit:`/`offset:` windows, `include`
+partials, six filters, isolated components, nesting guards,
+`docs/templates.md` with a verified error gallery, syntax freeze
+(ADR-005), and the 1k-render bench (140ms, budget 500ms).
 
 What exists: CLI (`new`, `dev`, `build`, `preview`, `check`, `clean`,
 `doctor`), Markdown subset (ADR-001), frontmatter with defaults
