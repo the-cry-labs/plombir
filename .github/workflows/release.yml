@@ -6,6 +6,9 @@ on:
   push:
     tags: ["v*"]
 
+permissions:
+  contents: write
+
 jobs:
   linux:
     runs-on: ubuntu-latest
@@ -18,6 +21,9 @@ jobs:
 
       - name: Install shards
         run: shards install --frozen
+
+      - name: Install file(1) for the static check
+        run: apk add --no-cache file
 
       - name: Build static release binary
         run: shards build --release --static && file bin/plombir
