@@ -33,25 +33,27 @@ Brand reminder (§34): modern, sharp, minimal, premium developer tool. Subtle pl
 
 ---
 
-## 1. Current state — Phase 5 active (`templates` v1 tagged)
+## 1. Current state — Phase 5 at its exit gate (assets/SEO/feeds done, pending tag)
 
-Phase 4 is done and tagged (`v0.5.0-templates`): positioned lexer
-→ parser → AST → renderer, errors with `file:line:col` plus
-closest-name hints, `elsif` + `limit:`/`offset:` windows, `include`
-partials, six filters, isolated components, nesting guards,
-`docs/templates.md` with a verified error gallery, syntax freeze
-(ADR-005), and the 1k-render bench (140ms, budget 500ms).
+Phase 4 is done and tagged (`v0.5.0-templates`). Phase 5 items 1–4
+are implemented: fingerprinted `assets/` + manifest + `public/`-wins
+merge, `| asset_url` filter + idempotent `/assets/…` rewrite + `build
+--strict`, `{{ seo_head }}` (title/description/canonical/OG/Twitter/
+JSON-LD), `sitemap.xml` + `robots.txt` + `rss.xml`, `check` SEO rules
+(missing `site.url`, missing description, title >60), safe `build
+--minify`, `assets-site` + `seo-site` goldens, `docs/assets.md` +
+`docs/seo.md`, and a frozen golden clock. Remaining for the exit
+gate: merge the Phase-5 stack and tag `v0.6.0-assets-seo`.
 
 What exists: CLI (`new`, `dev`, `build`, `preview`, `check`, `clean`,
 `doctor`), Markdown subset (ADR-001), frontmatter with defaults
 (ADR-002), pretty-URL router, collections + schemas + permalinks +
-`check` v1, template language v1 (conditionals, loops with
-`limit`/`offset`, includes, six filters, isolated components —
-`docs/templates.md`, ADR-005), `{{ content }}` layouts with chains,
-build pipeline (full + incremental), 318 green specs, CI (format +
-spec + release build).
-What is missing: assets/SEO/feeds (Phase 5), hardening + docs site +
-release binary (Phase 6).
+`check` v1 (now with SEO rules), template language v1 (seven filters
+with `asset_url` — ADR-006, `docs/templates.md`), `{{ seo_head }}`
+layouts, fingerprinted assets + feeds + sitemap/robots, build
+pipeline (full + incremental, `--strict`/`--minify`), 397 green
+specs, CI (format + spec + release build).
+What is missing: hardening + docs site + release binary (Phase 6).
 
 ---
 
@@ -323,10 +325,10 @@ Out of scope: image resize/AVIF/WebP, Sass/Tailwind/TypeScript, bundling/treesha
 
 ### 8.3 Acceptance criteria
 
-- [ ] Changing one byte of CSS changes its hashed filename; HTML refs update; old hash disappears (no orphans after `clean`+`build`).
-- [ ] Fresh blog has valid `sitemap.xml` (all routes), `robots.txt`, `rss.xml` (passes `xmllint`/feed validator), `<title>`/description/canonical/OG on every page without user config.
-- [ ] `plombir check` SEO section flags missing `site.url`, missing description with no excerpt fallback, oversized title (>60 chars, warning only).
-- [ ] `dist/` deployable by copying to any static host (smoke: `python3 -m http.server` serves correctly with relative asset paths).
+- [x] Changing one byte of CSS changes its hashed filename; HTML refs update; old hash disappears (no orphans after `clean`+`build`) (`spec/assets/pipeline_spec.cr` one-byte test; output dir rebuilt fresh).
+- [x] Fresh blog has valid `sitemap.xml` (all routes), `robots.txt`, `rss.xml` (passes `xmllint`/feed validator), `<title>`/description/canonical/OG on every page without user config (goldens `assets-site`/`seo-site`/`blog-site`; `xmllint` clean on a scaffolded build; canonical omitted without `site.url` per fixture rule).
+- [x] `plombir check` SEO section flags missing `site.url`, missing description with no excerpt fallback, oversized title (>60 chars, warning only) (`spec/check/output_spec.cr`, `spec/check/runner_spec.cr`, `seo-site` fixture spec).
+- [x] `dist/` deployable by copying to any static host (smoke: `python3 -m http.server` serves correctly with relative asset paths).
 
 ### 8.4 Exit gate
 
