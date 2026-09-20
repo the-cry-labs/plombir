@@ -81,4 +81,5 @@ needs attention.
 
 ## `plombir version`
 
-Print the version (`plombir --version` and `-V` work too).
+Print the version plus the baked-in commit
+(`plombir 0.1.0 (336e3d4)`; `plombir --version` and `-V` work too).

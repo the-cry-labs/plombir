@@ -1,6 +1,22 @@
 # Installation
 
+## From a release binary (Linux x86_64)
+
+```bash
+sh install.sh                  # latest release -> ~/.local/bin
+sh install.sh --prefix /usr/local/bin   # system-wide (needs sudo)
+PLOMBIR_VERSION=v1.0.0 sh install.sh    # pin a release
+```
+
+Or download `plombir-linux-x86_64.tar.gz` from the
+[releases page](https://github.com/the-cry-labs/plombir/releases)
+yourself, extract `plombir`, and put it on your `PATH`. The binary
+is statically linked: zero runtime dependencies, any output of
+`plombir --version` names its commit (`plombir 0.1.0 (336e3d4)`).
+
 ## From source
+
+macOS, other platforms, or hacking on Plombir itself.
 
 Prerequisites: Crystal `>= 1.21.0` and Shards (`>= 0.20.0`).
 
@@ -31,5 +47,7 @@ crystal tool format   # format sources before every commit
 - `crystal` not found: install Crystal `>= 1.21.0` from
   <https://crystal-lang.org/install/> (or check `plombir doctor`
   once built — it reports the toolchain version it sees).
-- Prebuilt release binaries will ship with v1.0; until then,
-  build from source as above.
+- Prebuilt binaries live on the releases page; a static build
+  from any checkout is `shards build --release --static`
+  (needs a musl toolchain — e.g. Alpine; plain glibc hosts
+  usually lack static libc).

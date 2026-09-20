@@ -41,5 +41,12 @@ jobs:
       - name: Build release binary
         run: shards build --release
 
+      - name: Fixture builds
+        run: |
+          ./bin/plombir new /tmp/ci-site
+          cd /tmp/ci-site
+          "$GITHUB_WORKSPACE/bin/plombir" build
+          "$GITHUB_WORKSPACE/bin/plombir" check
+
       - name: Benchmark (warn-only)
         run: ./scripts/bench.sh bin/plombir

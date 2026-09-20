@@ -1,0 +1,55 @@
+name: Release
+
+# Cut a release by tagging: git tag v1.0.0 && git push origin v1.0.0
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    container: crystallang/crystal:1.21.0-alpine
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fix git ownership (container runs as root)
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Install shards
+        run: shards install --frozen
+
+      - name: Build static release binary
+        run: shards build --release --static && file bin/plombir
+
+      - name: Package
+        run: tar czf plombir-linux-x86_64.tar.gz -C bin plombir
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: plombir-linux-x86_64.tar.gz
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Crystal
+        uses: crystal-lang/install-crystal@v1
+        with:
+          crystal: "1.21"
+
+      - name: Install shards
+        run: shards install --frozen
+
+      - name: Build release binary
+        run: shards build --release
+
+      - name: Package
+        run: tar czf plombir-macos-arm64.tar.gz -C bin plombir
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: plombir-macos-arm64.tar.gz
