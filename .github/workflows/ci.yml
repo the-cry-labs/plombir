@@ -40,3 +40,6 @@ jobs:
 
       - name: Build release binary
         run: shards build --release
+
+      - name: Benchmark (warn-only)
+        run: ./scripts/bench.sh bin/plombir

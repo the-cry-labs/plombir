@@ -49,3 +49,39 @@ description, `collections.posts` rows), load partials/components via
 `Page.partial_sources` / `Page.component_sources`, then render
 `home` inside `default` 1000× and time it (one-off script, removed
 after recording).
+
+## Phase 6 full pass (2026-09-20)
+
+Cold `build`, incremental, and `dev` startup on minimal / blog /
+200-page sites (`roadmap.md` §9.1.3). Same AMD Ryzen 7 8845HS as
+above, release binary (`shards build --release`, Crystal 1.21.0).
+`internal` = the `Built in Nms` pipeline number; `wall` = process
+spawn → exit (`date +%s%N` around `bin/plombir build`), best of 3.
+
+| Site | Pages | Cold build (internal) | Cold build (wall) | Budget (§11.7) |
+|---|---|---|---|---|
+| `minimal-site` | 3 | 1ms | ~6ms | <300ms |
+| `blog-site` | 12 | 4ms | ~9ms | <1s |
+| generated 200-page | 200 | 19ms | ~22ms | <1s |
+
+| Dev / incremental (`minimal-site`) | Result | Budget |
+|---|---|---|
+| `dev` cold start (spawn → first 200) | 19ms | <500ms |
+| Single-file rebuild (dev log) | 0ms, tier `page` | <100ms |
+| Single-file edit → served (20ms poll) | ~104ms | — |
+
+Every budget holds with 10–50× headroom. Edit→served latency is
+still detection physics (50ms watch interval + 75ms debounce), not
+rendering — the render itself is sub-millisecond.
+
+Reproduce: copy `spec/fixtures/minimal-site` (or `blog-site`) to
+`/tmp` and run `time bin/plombir build` (repeat 3×, best of 3). For
+the 200-page site, generate 200 posts (`title`/`date: 2026-09-13`
+frontmatter, one `default` layout with `{{ content }}`) and build
+the same way — `scripts/bench.sh` does exactly this and compares
+against the budgets above (warn-only). For `dev`, run
+`bin/plombir dev --port 3217`, poll `curl` until HTTP 200 (cold
+start), append a marker line to a page, and poll the served HTML
+until the marker appears (edit latency); the dev log line proves
+the incremental path (`↻ rebuilt index.md → / in 0ms`, no
+`(full)` marker).
