@@ -1,6 +1,6 @@
 # Plombir
 
-![Version](https://img.shields.io/badge/version-0.1.0-black)
+![Version](https://img.shields.io/badge/version-0.7.0-black)
 ![Crystal](https://img.shields.io/badge/crystal-%3E%3D_1.21-black)
 [![License](https://img.shields.io/badge/license-MPL--2.0-black)](LICENSE)
 [![Shardbox](https://img.shields.io/badge/shardbox-plombir-black)](https://shardbox.org/shards/plombir)

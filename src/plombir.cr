@@ -58,7 +58,7 @@ require "./cli/help"
 require "./cli/new"
 
 module Plombir
-  VERSION = "0.1.0"
+  VERSION = "0.7.0"
 
   # Short git SHA baked in at compile time (`--version` reports it);
   # "unknown" when built outside a git checkout (e.g. source tarball).
