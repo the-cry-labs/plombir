@@ -54,6 +54,9 @@ module Plombir
           return 1
         end
         0
+      rescue ex : Plombir::Config::Error
+        error.puts "✖ Invalid configuration\n\n#{ex.message}\n\nFix plombir.yml and rerun `plombir check`."
+        1
       rescue ex : Exception
         error.puts "✖ Check failed\n\n#{ex.message}"
         1
