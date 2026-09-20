@@ -1,5 +1,6 @@
 name: plombir
 version: 0.1.0
+description: Extremely fast static site generator with Markdown, frontmatter, layouts, and a modern content model.
 
 authors:
   - Subhan Gadirli <subhanqedirli@protonmail.com>
