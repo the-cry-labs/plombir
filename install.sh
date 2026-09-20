@@ -1,5 +1,5 @@
 #!/bin/sh
-# Installs the plombir release binary (Linux x86_64).
+# Installs the plombir release binary (Linux x86_64 and ARM64).
 #
 #   sh install.sh                          # latest release -> ~/.local/bin
 #   sh install.sh --prefix /usr/local/bin  # system-wide (needs sudo)
@@ -16,16 +16,20 @@ if [ "${PREFIX:-}" = "--prefix" ]; then PREFIX="$2"; fi
 PREFIX="${PREFIX:-$HOME/.local/bin}"
 
 OS="$(uname -s)"; ARCH="$(uname -m)"
-if [ "$OS" != "Linux" ] || [ "$ARCH" != "x86_64" ]; then
-  echo "error: no prebuilt binary for $OS/$ARCH - build from source:" >&2
-  echo "  git clone https://github.com/the-cry-labs/plombir && cd plombir && shards install && shards build --release" >&2
-  exit 1
-fi
+case "$OS/$ARCH" in
+  Linux/x86_64) ASSET="plombir-linux-x86_64.tar.gz" ;;
+  Linux/aarch64 | Linux/arm64) ASSET="plombir-linux-aarch64.tar.gz" ;;
+  *)
+    echo "error: no prebuilt binary for $OS/$ARCH - build from source:" >&2
+    echo "  git clone https://github.com/the-cry-labs/plombir && cd plombir && shards install && shards build --release" >&2
+    exit 1
+    ;;
+esac
 
 if [ "$VERSION" = "latest" ]; then
-  URL="$BASE/latest/download/plombir-linux-x86_64.tar.gz"
+  URL="$BASE/latest/download/$ASSET"
 else
-  URL="$BASE/download/$VERSION/plombir-linux-x86_64.tar.gz"
+  URL="$BASE/download/$VERSION/$ASSET"
 fi
 
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT INT TERM
