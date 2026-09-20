@@ -65,6 +65,15 @@ on Crystal `1.21` and `latest`.
 
 ## Documentation
 
+- `docs/getting-started.md` — first site in under five minutes.
+- `docs/installation.md` — build from source, dev setup.
+- `docs/project-structure.md` — generated tree and conventions.
+- `docs/cli.md` — every command, flag, and exit code.
+- `docs/content.md` — collections, frontmatter, permalinks, schemas, `check`.
+- `docs/templates.md` — template language, filters, components, error gallery.
+- `docs/assets.md` — `assets/` vs `public/`, fingerprinting.
+- `docs/seo.md` — meta tags, sitemap, feeds.
+- `docs/benchmarks.md` — measured timings and budgets.
 - `roadmap.md` — what gets built, in what order, and what “done” means.
 - `agents.md` — how to work in this repo (commands, style, tests, PR rules).
 - `docs/adr/` — architecture decision records.
