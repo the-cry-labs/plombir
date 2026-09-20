@@ -3,7 +3,7 @@ module Plombir
     # Prints `plombir --version` output.
     module Version
       def self.text : String
-        "plombir #{Plombir::VERSION}"
+        "plombir #{Plombir::VERSION} (#{Plombir::COMMIT})"
       end
 
       def self.print(io : IO = STDOUT) : Nil
