@@ -107,14 +107,16 @@ describe Plombir::Watcher do
         watcher = Plombir::Watcher::Watcher.new(dir, interval_ms: 10, debounce_ms: 20)
         channel = Channel(Array(Plombir::Watcher::Event)).new
         spawn { watcher.watch { |batch| channel.send(batch) } }
-
-        File.write(File.join(dir, "content", "a.md"), "# A\n")
-        select
-        when batch = channel.receive
-          batch.map(&.path).should contain("content/a.md")
+        begin
+          File.write(File.join(dir, "content", "a.md"), "# A\n")
+          select
+          when batch = channel.receive
+            batch.map(&.path).should contain("content/a.md")
+          when timeout(5.seconds)
+            fail "watcher delivered no events within 5s"
+          end
+        ensure
           watcher.stop
-        when timeout(5.seconds)
-          fail "watcher delivered no events within 5s"
         end
       end
     end
@@ -131,18 +133,20 @@ describe Plombir::Watcher do
         watcher = Plombir::Watcher::Watcher.new(root, interval_ms: 10, debounce_ms: 20)
         channel = Channel(Array(Plombir::Watcher::Event)).new
         spawn { watcher.watch { |batch| channel.send(batch) } }
+        begin
+          File.write(post, File.read(post) + "\nExtra line.\n")
+          select
+          when batch = channel.receive
+            hit = batch.find! { |e| e.path == "content/posts/hello-world.md" }
+            hit.kind.should eq(Plombir::Watcher::Kind::Content)
 
-        File.write(post, File.read(post) + "\nExtra line.\n")
-        select
-        when batch = channel.receive
-          hit = batch.find! { |e| e.path == "content/posts/hello-world.md" }
-          hit.kind.should eq(Plombir::Watcher::Kind::Content)
-
-          Plombir::Build::Pipeline.run(Plombir::Build::Context.new(root))
-          File.read(page).should contain("Extra line.")
+            Plombir::Build::Pipeline.run(Plombir::Build::Context.new(root))
+            File.read(page).should contain("Extra line.")
+          when timeout(10.seconds)
+            fail "watcher delivered no events within 10s"
+          end
+        ensure
           watcher.stop
-        when timeout(10.seconds)
-          fail "watcher delivered no events within 10s"
         end
       end
     end

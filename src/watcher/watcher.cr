@@ -155,7 +155,15 @@ module Plombir
         until stack.empty?
           relative = stack.pop
           absolute = relative.empty? ? @root : File.join(@root, relative)
-          Dir.each_child(absolute) do |child|
+          children = begin
+            Dir.children(absolute)
+          rescue File::NotFoundError | IO::Error
+            # Root vanished mid-watch (e.g. tempdir cleanup racing the
+            # poll fiber in specs): report empty instead of crashing
+            # the fiber with an unhandled exception.
+            return {} of String => Entry
+          end
+          children.each do |child|
             next if child.starts_with?(".")
             child_relative = relative.empty? ? child : File.join(relative, child)
             child_absolute = File.join(absolute, child)
