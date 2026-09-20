@@ -18,7 +18,7 @@ Licensed under the **Mozilla Public License 2.0 (MPL-2.0)**. See `LICENSE`.
 
 ## Quick start
 
-Install (Linux x86_64) or [build from source](docs/installation.md):
+Install (Linux x86_64/ARM64) or [build from source](docs/installation.md):
 
 ```bash
 sh install.sh

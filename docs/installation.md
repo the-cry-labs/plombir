@@ -1,6 +1,6 @@
 # Installation
 
-## From a release binary (Linux x86_64)
+## From a release binary (Linux x86_64 and ARM64)
 
 ```bash
 sh install.sh                  # latest release -> ~/.local/bin

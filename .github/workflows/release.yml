@@ -37,6 +37,33 @@ jobs:
           files: plombir-linux-x86_64.tar.gz
           generate_release_notes: true
 
+  linux-arm:
+    runs-on: ubuntu-24.04-arm
+    container: crystallang/crystal:1.21.0-alpine
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fix git ownership (container runs as root)
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Install shards
+        run: shards install --frozen
+
+      - name: Install file(1) for the static check
+        run: apk add --no-cache file
+
+      - name: Build static release binary
+        run: shards build --release --static && file bin/plombir
+
+      - name: Package
+        run: tar czf plombir-linux-aarch64.tar.gz -C bin plombir
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: plombir-linux-aarch64.tar.gz
+          generate_release_notes: true
+
   macos:
     runs-on: macos-latest
     steps:
