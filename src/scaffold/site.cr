@@ -55,17 +55,17 @@ module Plombir
 
       private def validate_name! : Nil
         if @name.strip.empty?
-          raise Error.new("Site name must not be blank.")
+          raise Error.new("Site name must not be blank.\n\nExample:\n  plombir new my-site")
         end
 
         if @name.split(File::SEPARATOR).includes?("..")
-          raise Error.new("Site name must not contain `..`, got #{@name.inspect}.")
+          raise Error.new("Site name must not contain `..`, got #{@name.inspect}.\n\nUse a plain directory name like `my-site`.")
         end
       end
 
       private def guard_destination! : Nil
         if File.exists?(@root) || Dir.exists?(@root)
-          raise Error.new("Directory #{@root.inspect} already exists.")
+          raise Error.new("Directory #{@root.inspect} already exists.\n\nPick a different name or remove the existing directory.")
         end
       end
 

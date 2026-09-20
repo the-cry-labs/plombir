@@ -242,7 +242,8 @@ module Plombir
         vars["site.url"] = context.site.url
         vars["seo_head"] = seo_head(entry, route, slug, context.site, assets)
         collections.each { |key, value| vars[key] = value }
-        rendered = Renderer::Page.render_file(body, entry.document.layout, context.layouts_dir, vars, entry.page.relative_path, nil, partials, components, assets)
+        layout_line = entry.document.data.has_key?("layout") ? entry.document.line_of("layout") : nil
+        rendered = Renderer::Page.render_file(body, entry.document.layout, context.layouts_dir, vars, entry.page.relative_path, layout_line, partials, components, assets)
         rewritten = Assets::Rewrite.rewrite(rendered, assets, context.public_dir)
         missing.concat(rewritten.missing)
         rewritten.html

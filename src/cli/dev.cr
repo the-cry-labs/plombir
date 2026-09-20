@@ -79,7 +79,7 @@ module Plombir
         error.puts ex.message
         1
       rescue ex : Plombir::Config::Error
-        error.puts "✖ Invalid configuration\n\n#{ex.message}"
+        error.puts "✖ Invalid configuration\n\n#{ex.message}\n\nFix plombir.yml and rebuild."
         1
       rescue ex : Exception
         error.puts "✖ Dev server failed\n\n#{ex.message}"
