@@ -78,4 +78,15 @@ describe Plombir::Scaffold::Site do
       index.should contain("/posts/hello-world/")
     end
   end
+
+  it "scaffolds post.html as a child of the default layout, not a copy" do
+    with_tempdir do |dir|
+      root = Plombir::Scaffold::Site.new("my-site", dir).create
+      post = File.read(File.join(root, "layouts/post.html"))
+
+      post.should contain("layout: default")
+      post.should contain("<article>")
+      post.should_not contain("<!DOCTYPE html>")
+    end
+  end
 end
