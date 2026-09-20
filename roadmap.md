@@ -33,17 +33,16 @@ Brand reminder (§34): modern, sharp, minimal, premium developer tool. Subtle pl
 
 ---
 
-## 1. Current state — Phase 5 at its exit gate (assets/SEO/feeds done, pending tag)
+## 1. Current state — Phase 5 done and tagged (Phase 6 next, not started)
 
-Phase 4 is done and tagged (`v0.5.0-templates`). Phase 5 items 1–4
-are implemented: fingerprinted `assets/` + manifest + `public/`-wins
-merge, `| asset_url` filter + idempotent `/assets/…` rewrite + `build
---strict`, `{{ seo_head }}` (title/description/canonical/OG/Twitter/
-JSON-LD), `sitemap.xml` + `robots.txt` + `rss.xml`, `check` SEO rules
-(missing `site.url`, missing description, title >60), safe `build
---minify`, `assets-site` + `seo-site` goldens, `docs/assets.md` +
-`docs/seo.md`, and a frozen golden clock. Remaining for the exit
-gate: merge the Phase-5 stack and tag `v0.6.0-assets-seo`.
+Phase 5 is done and tagged (`v0.6.0-assets-seo`): fingerprinted
+`assets/` + manifest + `public/`-wins merge, `| asset_url` filter +
+idempotent `/assets/…` rewrite + `build --strict`, `{{ seo_head }}`
+(title/description/canonical/OG/Twitter/JSON-LD), `sitemap.xml` +
+`robots.txt` + `rss.xml`, `check` SEO rules (missing `site.url`,
+missing description, title >60), safe `build --minify`, `assets-site`
++ `seo-site` goldens, `docs/assets.md` + `docs/seo.md`, and a frozen
+golden clock.
 
 What exists: CLI (`new`, `dev`, `build`, `preview`, `check`, `clean`,
 `doctor`), Markdown subset (ADR-001), frontmatter with defaults
