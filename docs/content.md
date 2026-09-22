@@ -93,6 +93,33 @@ collections:
       rating: {type: number}
 ```
 
+## Pagination
+
+Any page opts in with frontmatter (see `adr/007-pagination.md`).
+Page 1 renders in place; pages 2..N generate siblings. No
+`plombir.yml` keys in v1.
+
+```markdown
+---
+paginate: 5
+paginate_collection: posts   # default "posts"
+paginate_path: /blog/page:num/  # default "<page_url>page/:num/"
+---
+```
+
+```html
+{% for post in paginator.items %}<a href="{{ post.url }}">{{ post.title }}</a>{% end %}
+<p>{{ paginator.page }}/{{ paginator.total_pages }}</p>
+{% if paginator.next_page %}<a href="{{ paginator.next_page_path }}">Next</a>{% end %}
+```
+
+`paginator.*` keys: `collection`, `per_page`, `page`,
+`total_pages`, `total_items`, `items` (current slice rows with
+`title/url/excerpt/date`), `previous_page`/`next_page` (`""` when
+none), `previous_page_path`/`next_page_path`. Bad `paginate:` values
+fail with `file:line` + fix; URL clashes fail as duplicate routes;
+sitemap includes siblings; `dev` takes the full-rebuild path.
+
 ## Check
 
 `plombir check [--strict]` runs five sections — Content, Routes,

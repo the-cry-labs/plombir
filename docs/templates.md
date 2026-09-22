@@ -82,7 +82,8 @@ offset:1 %}`); either order, each at most once. The item binds one
 scalar per iteration, or one row's `item.key` entries for
 `collections.*` rows. Looping a missing collection renders nothing;
 interpolating one directly (`{{ collections.posts }}`) is an error
-with the loop spelling.
+with the loop spelling. Paginated listings loop `paginator.items`
+instead (see `content.md` + `adr/007-pagination.md`).
 
 ## Includes
 

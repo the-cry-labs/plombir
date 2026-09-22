@@ -138,4 +138,36 @@ describe Plombir::Frontmatter do
     ex.message.to_s.should contain("draft.md:2")
     ex.message.to_s.should contain("true or false")
   end
+
+  it "reads pagination keys, defaulting collection to posts" do
+    plain = Plombir::Frontmatter.parse("Body\n", "a.md")
+    plain.paginate_per_page.should be_nil
+    plain.paginate_collection.should eq("posts")
+    plain.paginate_path.should be_nil
+
+    paged = Plombir::Frontmatter.parse("---\npaginate: 5\n---\nBody\n", "b.md")
+    paged.paginate_per_page.should eq(5)
+    paged.paginate_collection.should eq("posts")
+    paged.paginate_path.should be_nil
+
+    custom = Plombir::Frontmatter.parse("---\npaginate: 3\npaginate_collection: docs\npaginate_path: /blog/page:num/\n---\nBody\n", "c.md")
+    custom.paginate_per_page.should eq(3)
+    custom.paginate_collection.should eq("docs")
+    custom.paginate_path.should eq("/blog/page:num/")
+  end
+
+  it "rejects bad pagination values with file, field, and example" do
+    ex = expect_raises(Plombir::Frontmatter::Error) do
+      Plombir::Frontmatter.parse("---\npaginate: zero\n---\nBody\n", "p.md").paginate_per_page
+    end
+    ex.message.to_s.should contain("p.md:2")
+    ex.message.to_s.should contain("Field: paginate")
+    ex.message.to_s.should contain("paginate: 5")
+
+    bad_path = expect_raises(Plombir::Frontmatter::Error) do
+      Plombir::Frontmatter.parse("---\npaginate: 5\npaginate_path: /blog/\n---\nBody\n", "q.md").paginate_path
+    end
+    bad_path.message.to_s.should contain("Field: paginate_path")
+    bad_path.message.to_s.should contain(":num")
+  end
 end

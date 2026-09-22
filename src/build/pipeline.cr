@@ -93,6 +93,19 @@ module Plombir
     # result.pages # => 3
     # ```
     module Pipeline
+      # One generated pagination sibling: page 2..N of a listing.
+      # *entry* is the source listing, *route* its generated URL,
+      # *vars* the `paginator.*` template vars for that page.
+      struct Extra
+        getter entry : Entry
+        getter page_number : Int32
+        getter route : Router::Route
+        getter vars : Hash(String, Renderer::Page::Value)
+
+        def initialize(@entry : Entry, @page_number : Int32, @route : Router::Route, @vars : Hash(String, Renderer::Page::Value))
+        end
+      end
+
       def self.run(context : Context = Context.new) : Result
         started = Time.instant
         guard_output!(context)
@@ -100,14 +113,16 @@ module Plombir
         entries = discover(context)
         validate_schemas!(context, entries)
         routes = resolve(entries, context.patterns)
+        collections = collection_vars(entries, routes)
+        extras = build_extras(entries, routes, collections)
         prepare_output(context)
         assets = process_assets(context)
         warnings = assets.warnings.dup
-        render_all(entries, routes, context, assets.files, warnings)
-        write_seo_files(entries, routes, context)
+        render_all(entries, routes, context, assets.files, warnings, collections, extras)
+        write_seo_files(entries, routes, context, extras)
         copy_public(context)
 
-        Result.new(routes.size, (Time.instant - started).total_milliseconds.to_i64, context.output, assets.files.size, warnings)
+        Result.new(routes.size + extras.size, (Time.instant - started).total_milliseconds.to_i64, context.output, assets.files.size, warnings)
       end
 
       # Validates frontmatter against the context schemas, printing
@@ -155,6 +170,38 @@ module Plombir
         Dir.mkdir_p(context.output_dir)
       end
 
+      # Builds pagination siblings for entries with `paginate:`.
+      # Page 1 renders in place; pages 2..N generate extra routes.
+      # Invalid `paginate:` values raise `Frontmatter::Error` with
+      # `file:line`; URL clashes raise `Router::Conflict`.
+      def self.build_extras(entries : Array(Entry), routes : Hash(String, Router::Route), collections : Hash(String, Renderer::Page::Value)) : Array(Extra)
+        seen = Set(String).new(routes.values.map(&.url))
+        extras = [] of Extra
+        entries.each do |entry|
+          per_page = entry.document.paginate_per_page
+          next if per_page.nil?
+          collection = entry.document.paginate_collection
+          pattern = entry.document.paginate_path
+          base = routes[entry.page.relative_path]
+          rows = collections["collections.#{collection}"]?.try(&.as(Array(Hash(String, String)))) || [] of Hash(String, String)
+          total = Content::Pagination.total_pages(rows.size, per_page)
+          next if total <= 1
+          (2..total).each do |number|
+            url = Content::Pagination.page_url(base.url, pattern, number)
+            if seen.includes?(url)
+              owner = routes.find { |_, route| route.url == url }.try(&.[0]) || "pagination"
+              raise Router::Conflict.new(url, [entry.page.relative_path, owner].sort)
+            end
+            seen << url
+            route = Router.route(entry.page.relative_path, url)
+            items = Content::Pagination.page_items(rows, number, per_page)
+            vars = Content::Pagination.vars(collection, per_page, number, total, rows.size, items, base.url, pattern)
+            extras << Extra.new(entry, number, route, vars)
+          end
+        end
+        extras
+      end
+
       # Renders every entry into the prepared output directory,
       # rewriting `/assets/…` references through *manifest*. References
       # backed by neither `assets/` nor `public/` append a warning
@@ -165,14 +212,17 @@ module Plombir
         context : Context,
         manifest : Hash(String, String),
         warnings : Array(String),
+        collections : Hash(String, Renderer::Page::Value),
+        extras : Array(Extra),
       ) : Nil
-        collections = collection_vars(entries, routes)
         partials = Renderer::Page.partial_sources(context.layouts_dir)
         components = Renderer::Page.component_sources(context.components_dir)
+        first_vars = page_one_vars(entries, routes, collections)
         entries.each do |entry|
           route = routes[entry.page.relative_path]
           missing = [] of String
-          html = render_one(entry, route, context, collections, partials, components, manifest, missing)
+          paginator = first_vars[entry.page.relative_path]? || {} of String => Renderer::Page::Value
+          html = render_one(entry, route, context, collections, partials, components, manifest, missing, paginator)
           missing.each do |reference|
             warnings << "#{entry.page.relative_path} references missing asset #{reference.inspect} — add it under assets/ (fingerprinted) or public/ (as-is)."
           end
@@ -181,6 +231,34 @@ module Plombir
           Dir.mkdir_p(File.dirname(destination))
           File.write(destination, html)
         end
+        extras.each do |extra|
+          missing = [] of String
+          html = render_one(extra.entry, extra.route, context, collections, partials, components, manifest, missing, extra.vars)
+          missing.each do |reference|
+            warnings << "#{extra.entry.page.relative_path} references missing asset #{reference.inspect} — add it under assets/ (fingerprinted) or public/ (as-is)."
+          end
+          html = Utils::Html.minify(html) if context.minify
+          destination = File.join(context.output_dir, extra.route.output_path)
+          Dir.mkdir_p(File.dirname(destination))
+          File.write(destination, html)
+        end
+      end
+
+      # Builds page-1 `paginator.*` vars for paginated entries.
+      private def self.page_one_vars(entries : Array(Entry), routes : Hash(String, Router::Route), collections : Hash(String, Renderer::Page::Value)) : Hash(String, Hash(String, Renderer::Page::Value))
+        vars = {} of String => Hash(String, Renderer::Page::Value)
+        entries.each do |entry|
+          per_page = entry.document.paginate_per_page
+          next if per_page.nil?
+          collection = entry.document.paginate_collection
+          pattern = entry.document.paginate_path
+          base = routes[entry.page.relative_path]
+          rows = collections["collections.#{collection}"]?.try(&.as(Array(Hash(String, String)))) || [] of Hash(String, String)
+          total = Content::Pagination.total_pages(rows.size, per_page)
+          items = Content::Pagination.page_items(rows, 1, per_page)
+          vars[entry.page.relative_path] = Content::Pagination.vars(collection, per_page, 1, total, rows.size, items, base.url, pattern)
+        end
+        vars
       end
 
       # Builds the `collections.<name>` template vars: per-collection
@@ -227,8 +305,9 @@ module Plombir
       # prebuilt maps instead. *assets* is the fingerprinted-asset
       # manifest for `| asset_url` and the `/assets/…` rewrite; refs
       # backed by neither `assets/` nor `public/` are collected into
-      # *missing* for the caller to warn about.
-      def self.render_one(entry : Entry, route : Router::Route, context : Context, collections : Hash(String, Renderer::Page::Value) = {} of String => Renderer::Page::Value, partials : Renderer::Page::Partials? = nil, components : Renderer::Page::Components? = nil, assets : Hash(String, String) = {} of String => String, missing : Array(String) = [] of String) : String
+      # *missing* for the caller to warn about. *paginator* carries
+      # `paginator.*` vars for paginated listings (empty otherwise).
+      def self.render_one(entry : Entry, route : Router::Route, context : Context, collections : Hash(String, Renderer::Page::Value) = {} of String => Renderer::Page::Value, partials : Renderer::Page::Partials? = nil, components : Renderer::Page::Components? = nil, assets : Hash(String, String) = {} of String => String, missing : Array(String) = [] of String, paginator : Hash(String, Renderer::Page::Value) = {} of String => Renderer::Page::Value) : String
         body = Markdown.render(entry.document.body)
         vars = Renderer::Page::Context.new
         slug = Router.slugify(File.basename(entry.page.relative_path, ".md"))
@@ -242,6 +321,7 @@ module Plombir
         vars["site.url"] = context.site.url
         vars["seo_head"] = seo_head(entry, route, slug, context.site, assets)
         collections.each { |key, value| vars[key] = value }
+        paginator.each { |key, value| vars[key] = value }
         layout_line = entry.document.data.has_key?("layout") ? entry.document.line_of("layout") : nil
         rendered = Renderer::Page.render_file(body, entry.document.layout, context.layouts_dir, vars, entry.page.relative_path, layout_line, partials, components, assets)
         rewritten = Assets::Rewrite.rewrite(rendered, assets, context.public_dir)
@@ -278,11 +358,16 @@ module Plombir
       # only when `posts` has entries). Root files by design, so a
       # matching `public/` file cleanly overrides them later — the
       # documented seam for staging rules and hand-written maps.
-      private def self.write_seo_files(entries : Array(Entry), routes : Hash(String, Router::Route), context : Context) : Nil
+      # *extras* are pagination siblings (same date as their listing).
+      private def self.write_seo_files(entries : Array(Entry), routes : Hash(String, Router::Route), context : Context, extras : Array(Extra) = [] of Extra) : Nil
         pages = entries.map do |entry|
           route = routes[entry.page.relative_path]
           date = entry.document.date(entry.page.mtime)
           Seo::Sitemap::Page.new(route.url, date.try(&.to_s("%Y-%m-%d")))
+        end
+        extras.each do |extra|
+          date = extra.entry.document.date(extra.entry.page.mtime)
+          pages << Seo::Sitemap::Page.new(extra.route.url, date.try(&.to_s("%Y-%m-%d")))
         end
         Seo::Sitemap.write(context.output_dir, pages, context.site.url)
         Seo::Robots.write(context.output_dir, context.site.url)
