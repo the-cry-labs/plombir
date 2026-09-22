@@ -172,6 +172,9 @@ module Plombir
           if paginated_site?
             return full_as(Tier::Full, "pagination changed", started)
           end
+          if taxonomy_layouts_present?
+            return full_as(Tier::Full, "taxonomies changed", started)
+          end
           if events.any? { |e| e.kind == Watcher::Kind::Content && e.change != Watcher::Change::Modified }
             return full_as(Tier::Full, "pages added or removed", started)
           end
@@ -307,6 +310,16 @@ module Plombir
         private def paginated_site? : Bool
           Pipeline.discover(@context).any? do |entry|
             !entry.document.paginate_per_page.nil?
+          end
+        end
+
+        # Taxonomy archives aggregate every post, so any content change
+        # can move them — take the full path when their layouts opt in
+        # (see ADR-008). File checks only, no discovery cost.
+        private def taxonomy_layouts_present? : Bool
+          layouts = @context.layouts_dir
+          %w[tag.html tags.html category.html categories.html].any? do |name|
+            File.file?(File.join(layouts, name))
           end
         end
 

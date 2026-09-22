@@ -139,6 +139,23 @@ describe Plombir::Frontmatter do
     ex.message.to_s.should contain("true or false")
   end
 
+  it "reads categories with a singular alias, merged deduped" do
+    Plombir::Frontmatter.parse("Body\n", "a.md").categories.should eq([] of String)
+    Plombir::Frontmatter.parse("---\ncategories: guides\n---\nBody\n", "b.md").categories.should eq(["guides"])
+    Plombir::Frontmatter.parse("---\ncategories:\n  - a\n  - b\n---\nBody\n", "c.md").categories.should eq(["a", "b"])
+    Plombir::Frontmatter.parse("---\ncategory: news\n---\nBody\n", "d.md").categories.should eq(["news"])
+    Plombir::Frontmatter.parse("---\ncategories:\n  - a\ncategory: b\n---\nBody\n", "e.md").categories.should eq(["a", "b"])
+  end
+
+  it "rejects mapping categories with file and line" do
+    ex = expect_raises(Plombir::Frontmatter::Error) do
+      Plombir::Frontmatter.parse("---\ncategories:\n  key: value\n---\nBody\n", "c.md").categories
+    end
+
+    ex.message.to_s.should contain("c.md:2")
+    ex.message.to_s.should contain("single value or a list")
+  end
+
   it "reads pagination keys, defaulting collection to posts" do
     plain = Plombir::Frontmatter.parse("Body\n", "a.md")
     plain.paginate_per_page.should be_nil
