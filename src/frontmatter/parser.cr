@@ -86,17 +86,32 @@ module Plombir
       # doc.tags # => ["plombir", "hello"]
       # ```
       def tags : Array(String)
-        value = @data["tags"]?
-        return [] of String if value.nil? || value.raw.nil?
-        if list = value.as_a?
-          return list.map { |entry| (entry.as_s? || entry.to_s).strip }.reject(&.empty?)
+        list_field("tags")
+      end
+
+      # Returns categories as a normalized list (`categories:` plus
+      # singular `category:` alias, merged deduped — see ADR-008).
+      #
+      # ```
+      # doc.categories # => ["guides", "news"]
+      # ```
+      def categories : Array(String)
+        merged = list_field("categories", required: false)
+        single = @data["category"]?
+        unless single.nil? || single.raw.nil?
+          if list = single.as_a?
+            list.each do |entry|
+              text = (entry.as_s? || entry.to_s).strip
+              merged << text unless text.empty? || merged.includes?(text)
+            end
+          elsif text = single.as_s?
+            stripped = text.strip
+            merged << stripped unless stripped.empty? || merged.includes?(stripped)
+          else
+            raise Error.new(@file, key_line("category"), tags_message_for("category"))
+          end
         end
-        if text = value.as_s?
-          stripped = text.strip
-          return [] of String if stripped.empty?
-          return [stripped]
-        end
-        raise Error.new(@file, key_line("tags"), tags_message)
+        merged
       end
 
       # Returns whether the page is a draft (`draft: true`).
@@ -231,6 +246,26 @@ module Plombir
 
       private def tags_message : String
         field_error("tags", "a single value or a list of values", "tags: plombir")
+      end
+
+      private def tags_message_for(key : String) : String
+        field_error(key, "a single value or a list of values", "#{key}: plombir")
+      end
+
+      # Normalizes a scalar-or-list string field (strip, drop empties).
+      private def list_field(key : String, required : Bool = false) : Array(String)
+        value = @data[key]?
+        return [] of String if value.nil? || value.raw.nil?
+        if list = value.as_a?
+          return list.map { |entry| (entry.as_s? || entry.to_s).strip }.reject(&.empty?)
+        end
+        if text = value.as_s?
+          stripped = text.strip
+          return [] of String if stripped.empty? && !required
+          return [stripped] unless stripped.empty?
+          return [] of String
+        end
+        raise Error.new(@file, key_line(key), tags_message_for(key))
       end
 
       private def draft_message : String
