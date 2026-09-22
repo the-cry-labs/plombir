@@ -33,12 +33,16 @@ deliberate and documented in code.
 | `description` | string | `""` |
 | `date` | `YYYY-MM-DD` or RFC3339 (quoted or not) | file mtime (ADR-002) |
 | `tags` | string or list of strings | `[]` |
+| `categories` / `category` | string or list of strings (merged) | `[]` |
 | `layout` | string | `"default"` |
 | `draft` | bool | `false` |
 | `permalink` | string | unset (conventional URL or pattern) |
 | `excerpt` | string | derived (see below) |
+| `paginate` | int > 0 | unset (no pagination) |
+| `paginate_collection` | string | `"posts"` |
+| `paginate_path` | string with `:num` | `"<page_url>page/:num/"` |
 
-Tags strip whitespace and drop empties in both forms. Invalid values
+Tags and categories strip whitespace and drop empties in both forms. Invalid values
 fail with the field, the received source line, and the expectation:
 
 ```text
@@ -119,6 +123,40 @@ paginate_path: /blog/page:num/  # default "<page_url>page/:num/"
 none), `previous_page_path`/`next_page_path`. Bad `paginate:` values
 fail with `file:line` + fix; URL clashes fail as duplicate routes;
 sitemap includes siblings; `dev` takes the full-rebuild path.
+
+## Taxonomies
+
+`tags:` (exists) plus `categories:`/`category:` alias group posts
+into archives (see `adr/008-taxonomies.md`). Opt-in by layout
+presence — no layouts, no pages, existing builds byte-identical:
+
+- `layouts/tag.html` → `/tags/:slug/` term pages
+- `layouts/tags.html` → `/tags/` index
+- `layouts/category.html` → `/categories/:slug/`
+- `layouts/categories.html` → `/categories/` index
+
+```markdown
+---
+tags:
+  - crystal
+categories: guides
+---
+```
+
+```html
+<!-- layouts/tag.html -->
+<h1>{{ taxonomy.name }}</h1>
+{% for post in taxonomy.items %}<a href="{{ post.url }}">{{ post.title }}</a>{% end %}
+
+<!-- layouts/tags.html -->
+{% for term in taxonomy.terms %}<a href="{{ term.url }}">{{ term.name }} ({{ term.count }})</a>{% end %}
+```
+
+Term pages get `taxonomy.type/slug/name` + `taxonomy.items`
+(`title/url/excerpt/date` rows); index pages get `taxonomy.terms`
+(`name/slug/url/count` rows). Clashes fail as duplicate routes;
+sitemap includes archives; `dev` takes the full-rebuild path when
+taxonomy layouts exist.
 
 ## Check
 

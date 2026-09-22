@@ -36,10 +36,12 @@ Option 1. Rules:
 - URLs: `/tags/`, `/tags/:slug/`, `/categories/`,
   `/categories/:slug/`. Clashes with content routes raise
   `Router::Conflict`.
-- Layouts: term pages try `layouts/tag.html` / `layouts/category.html`
-  then `layouts/default.html`; index pages try `layouts/tags.html` /
-  `layouts/categories.html` then `default.html`. Missing `default.html`
-  with terms present is a build error listing available layouts.
+- Opt-in by layout presence (v1, keeps existing builds byte-identical):
+  term pages generate only when `layouts/tag.html` / `layouts/category.html`
+  exists; index pages only when `layouts/tags.html` / `layouts/categories.html`
+  exists. No terms → no pages even with layouts. Missing `default.html`
+  is irrelevant — taxonomy pages never fall back; they render with their
+  dedicated layout only.
 - Template vars (flat, strings + `taxonomy.items` rows of
   `title/url/excerpt/date`):
   `taxonomy.type` (`tags`/`categories`), `taxonomy.name` (term display,
@@ -50,7 +52,7 @@ Option 1. Rules:
   Decision: index gets `taxonomy.terms` as `Array(Hash)` of
   `name/slug/url/count` (strings) — loopable with existing engine.
 - Sitemap includes taxonomy URLs; RSS unchanged; `check` covers via
-  temp build; `dev` takes the full-rebuild path when terms exist.
+  temp build; `dev` takes the full-rebuild path when taxonomy layouts exist.
 
 ## Consequences
 

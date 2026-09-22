@@ -106,6 +106,28 @@ module Plombir
         end
       end
 
+      # One generated taxonomy archive: a term page (`/tags/crystal/`)
+      # or an index (`/tags/`). *kind* is `tags`/`categories`, *slug*
+      # empty on indexes. *items* holds post rows on term pages;
+      # *terms* holds `{name, slug, url, count}` rows on indexes.
+      struct TaxoPage
+        getter kind : String
+        getter name : String
+        getter slug : String
+        getter route : Router::Route
+        getter title : String
+        getter layout : String
+        getter items : Array(Hash(String, String))
+        getter terms : Array(Hash(String, String))
+
+        def initialize(@kind : String, @name : String, @slug : String, @route : Router::Route, @title : String, @layout : String, @items : Array(Hash(String, String)) = [] of Hash(String, String), @terms : Array(Hash(String, String)) = [] of Hash(String, String))
+        end
+
+        def index? : Bool
+          @slug.empty?
+        end
+      end
+
       def self.run(context : Context = Context.new) : Result
         started = Time.instant
         guard_output!(context)
@@ -115,14 +137,15 @@ module Plombir
         routes = resolve(entries, context.patterns)
         collections = collection_vars(entries, routes)
         extras = build_extras(entries, routes, collections)
+        taxo = build_taxonomy(entries, routes, context, extras)
         prepare_output(context)
         assets = process_assets(context)
         warnings = assets.warnings.dup
-        render_all(entries, routes, context, assets.files, warnings, collections, extras)
-        write_seo_files(entries, routes, context, extras)
+        render_all(entries, routes, context, assets.files, warnings, collections, extras, taxo)
+        write_seo_files(entries, routes, context, extras, taxo)
         copy_public(context)
 
-        Result.new(routes.size + extras.size, (Time.instant - started).total_milliseconds.to_i64, context.output, assets.files.size, warnings)
+        Result.new(routes.size + extras.size + taxo.size, (Time.instant - started).total_milliseconds.to_i64, context.output, assets.files.size, warnings)
       end
 
       # Validates frontmatter against the context schemas, printing
@@ -202,6 +225,63 @@ module Plombir
         extras
       end
 
+      # Builds taxonomy archives gated on layout presence (see ADR-008):
+      # term pages need `layouts/tag.html` / `category.html`, indexes
+      # need `layouts/tags.html` / `categories.html`. No layouts or no
+      # terms emit nothing, so existing builds stay byte-identical.
+      # URL clashes with content, pagination, or taxonomy raise
+      # `Router::Conflict`.
+      def self.build_taxonomy(entries : Array(Entry), routes : Hash(String, Router::Route), context : Context, extras : Array(Extra) = [] of Extra) : Array(TaxoPage)
+        layouts = context.layouts_dir
+        wants = {
+          "tags"       => {File.file?(File.join(layouts, "tag.html")), File.file?(File.join(layouts, "tags.html"))},
+          "categories" => {File.file?(File.join(layouts, "category.html")), File.file?(File.join(layouts, "categories.html"))},
+        }
+        return [] of TaxoPage unless wants.values.any? { |(term, index)| term || index }
+
+        seen = Set(String).new(routes.values.map(&.url))
+        extras.each { |extra| seen << extra.route.url }
+        owners = {} of String => String
+        routes.each { |relative, route| owners[route.url] = relative }
+
+        pages = entries.map { |entry| {entry.page, entry.document} }
+        taxo = [] of TaxoPage
+        %w[tags categories].each do |kind|
+          term_wanted, index_wanted = wants[kind]
+          next unless term_wanted || index_wanted
+          singular = kind == "tags" ? "tag" : "category"
+          plural = kind
+          terms = Content::Taxonomy.terms(pages, routes, kind)
+          next if terms.empty?
+          if term_wanted
+            terms.each do |term|
+              url = Content::Taxonomy.url_for(kind, term.slug)
+              if seen.includes?(url)
+                raise Router::Conflict.new(url, ["taxonomy:#{url}", owners[url]? || "pagination"].sort)
+              end
+              seen << url
+              owners[url] = "taxonomy:#{url}"
+              route = Router.route("taxonomy-#{kind}-#{term.slug}.md", url)
+              taxo << TaxoPage.new(kind, term.name, term.slug, route, term.name, singular, term.items)
+            end
+          end
+          if index_wanted
+            url = Content::Taxonomy.index_url(kind)
+            if seen.includes?(url)
+              raise Router::Conflict.new(url, ["taxonomy:#{url}", owners[url]? || "pagination"].sort)
+            end
+            seen << url
+            owners[url] = "taxonomy:#{url}"
+            route = Router.route("taxonomy-#{kind}-index.md", url)
+            rows = terms.map do |term|
+              {"name" => term.name, "slug" => term.slug, "url" => term.url(kind), "count" => term.items.size.to_s}
+            end
+            taxo << TaxoPage.new(kind, "", "", route, plural.capitalize, plural, [] of Hash(String, String), rows)
+          end
+        end
+        taxo
+      end
+
       # Renders every entry into the prepared output directory,
       # rewriting `/assets/…` references through *manifest*. References
       # backed by neither `assets/` nor `public/` append a warning
@@ -214,6 +294,7 @@ module Plombir
         warnings : Array(String),
         collections : Hash(String, Renderer::Page::Value),
         extras : Array(Extra),
+        taxo : Array(TaxoPage) = [] of TaxoPage,
       ) : Nil
         partials = Renderer::Page.partial_sources(context.layouts_dir)
         components = Renderer::Page.component_sources(context.components_dir)
@@ -242,6 +323,35 @@ module Plombir
           Dir.mkdir_p(File.dirname(destination))
           File.write(destination, html)
         end
+        taxo.each do |page|
+          html = render_taxonomy(page, context, partials, components, manifest)
+          html = Utils::Html.minify(html) if context.minify
+          destination = File.join(context.output_dir, page.route.output_path)
+          Dir.mkdir_p(File.dirname(destination))
+          File.write(destination, html)
+        end
+      end
+
+      # Renders one taxonomy archive (term or index) inside its dedicated
+      # layout with `taxonomy.*` vars plus standard `title/url/site.*/seo_head`.
+      private def self.render_taxonomy(page : TaxoPage, context : Context, partials : Renderer::Page::Partials, components : Renderer::Page::Components, manifest : Hash(String, String)) : String
+        vars = Renderer::Page::Context.new
+        vars["title"] = page.title
+        vars["description"] = ""
+        vars["date"] = ""
+        vars["tags"] = [] of String
+        vars["url"] = page.route.url
+        vars["site.title"] = context.site.title
+        vars["site.description"] = context.site.description
+        vars["site.url"] = context.site.url
+        vars["seo_head"] = Seo::Head.build(title: page.title, description: "", excerpt: "", image: nil, date: nil, collection: "", url: page.route.url, site: context.site)
+        vars["taxonomy.type"] = page.kind
+        vars["taxonomy.name"] = page.name
+        vars["taxonomy.slug"] = page.slug
+        vars["taxonomy.items"] = page.items
+        vars["taxonomy.terms"] = page.terms
+        file = "taxonomy:#{page.route.url}"
+        Renderer::Page.render_file("", page.layout, context.layouts_dir, vars, file, nil, partials, components, manifest)
       end
 
       # Builds page-1 `paginator.*` vars for paginated entries.
@@ -358,8 +468,9 @@ module Plombir
       # only when `posts` has entries). Root files by design, so a
       # matching `public/` file cleanly overrides them later — the
       # documented seam for staging rules and hand-written maps.
-      # *extras* are pagination siblings (same date as their listing).
-      private def self.write_seo_files(entries : Array(Entry), routes : Hash(String, Router::Route), context : Context, extras : Array(Extra) = [] of Extra) : Nil
+      # *extras* are pagination siblings (same date as their listing);
+      # *taxo* are taxonomy archives (undated).
+      private def self.write_seo_files(entries : Array(Entry), routes : Hash(String, Router::Route), context : Context, extras : Array(Extra) = [] of Extra, taxo : Array(TaxoPage) = [] of TaxoPage) : Nil
         pages = entries.map do |entry|
           route = routes[entry.page.relative_path]
           date = entry.document.date(entry.page.mtime)
@@ -368,6 +479,9 @@ module Plombir
         extras.each do |extra|
           date = extra.entry.document.date(extra.entry.page.mtime)
           pages << Seo::Sitemap::Page.new(extra.route.url, date.try(&.to_s("%Y-%m-%d")))
+        end
+        taxo.each do |page|
+          pages << Seo::Sitemap::Page.new(page.route.url, nil)
         end
         Seo::Sitemap.write(context.output_dir, pages, context.site.url)
         Seo::Robots.write(context.output_dir, context.site.url)
