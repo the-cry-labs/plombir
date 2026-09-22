@@ -169,6 +169,9 @@ module Plombir
           if kinds.includes?(Watcher::Kind::Public) || kinds.includes?(Watcher::Kind::Asset)
             return full_as(Tier::Full, "public assets changed", started)
           end
+          if paginated_site?
+            return full_as(Tier::Full, "pagination changed", started)
+          end
           if events.any? { |e| e.kind == Watcher::Kind::Content && e.change != Watcher::Change::Modified }
             return full_as(Tier::Full, "pages added or removed", started)
           end
@@ -295,6 +298,16 @@ module Plombir
         private def full_as(tier : Tier, reason : String, started : Time::Instant) : RebuildReport
           result = full
           RebuildReport.new(tier, result.pages, elapsed(started), reason)
+        end
+
+        # Paginated listings fan out to sibling pages, so tiered
+        # single-page rebuilds cannot stay correct — take the full
+        # path instead (see ADR-007). Errors propagate to the `dev`
+        # loop, which prints them and keeps serving last-good output.
+        private def paginated_site? : Bool
+          Pipeline.discover(@context).any? do |entry|
+            !entry.document.paginate_per_page.nil?
+          end
         end
 
         private def refresh_graph : Nil
