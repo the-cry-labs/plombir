@@ -120,6 +120,58 @@ module Plombir
         raise Error.new(@file, key_line("draft"), draft_message)
       end
 
+      # Returns items per page for paginated listings (`paginate: 5`),
+      # or `nil` when the page is not paginated (see ADR-007).
+      #
+      # ```
+      # doc.paginate_per_page # => 5
+      # ```
+      def paginate_per_page : Int32?
+        value = @data["paginate"]?
+        return nil if value.nil? || value.raw.nil?
+        if number = value.as_i?
+          return number.to_i32 if number > 0
+        end
+        if text = value.as_s?
+          if number = text.strip.to_i?(whitespace: false)
+            return number.to_i32 if number > 0
+          end
+        end
+        raise Error.new(@file, key_line("paginate"), paginate_message)
+      end
+
+      # Returns the paginated collection name (`paginate_collection:`),
+      # defaulting to `"posts"` (see ADR-007).
+      #
+      # ```
+      # doc.paginate_collection # => "posts"
+      # ```
+      def paginate_collection : String
+        value = @data["paginate_collection"]?
+        return "posts" if value.nil? || value.raw.nil?
+        if text = value.as_s?
+          stripped = text.strip
+          return stripped unless stripped.empty?
+        end
+        raise Error.new(@file, key_line("paginate_collection"), paginate_collection_message)
+      end
+
+      # Returns the paginated URL pattern (`paginate_path:` with `:num`),
+      # or `nil` when the `<page_url>page/:num/` default applies.
+      #
+      # ```
+      # doc.paginate_path # => "/blog/page:num/"
+      # ```
+      def paginate_path : String?
+        value = @data["paginate_path"]?
+        return nil if value.nil? || value.raw.nil?
+        if text = value.as_s?
+          stripped = text.strip
+          return stripped if !stripped.empty? && stripped.includes?(":num")
+        end
+        raise Error.new(@file, key_line("paginate_path"), paginate_path_message)
+      end
+
       # First `#`-style heading in the body, or `nil` when there is none.
       private def first_heading : String?
         body.each_line do |line|
@@ -183,6 +235,18 @@ module Plombir
 
       private def draft_message : String
         field_error("draft", "true or false", "draft: true")
+      end
+
+      private def paginate_message : String
+        field_error("paginate", "a page size like 5", "paginate: 5")
+      end
+
+      private def paginate_collection_message : String
+        field_error("paginate_collection", "a collection name like posts", "paginate_collection: posts")
+      end
+
+      private def paginate_path_message : String
+        field_error("paginate_path", "a path with :num like /blog/page:num/", "paginate_path: /blog/page:num/")
       end
     end
 
