@@ -3,7 +3,7 @@
 #
 #   sh install.sh                          # latest release -> ~/.local/bin
 #   sh install.sh --prefix /usr/local/bin  # system-wide (needs sudo)
-#   PLOMBIR_VERSION=v0.7.0 sh install.sh   # pin a release
+#   PLOMBIR_VERSION=v1.0.0 sh install.sh   # pin a release
 #
 # macOS / other platforms: build from source (see docs/installation.md).
 # Env overrides (testing): PLOMBIR_RELEASE_BASE, PLOMBIR_VERSION.

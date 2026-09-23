@@ -5,14 +5,14 @@
 ```bash
 sh install.sh                  # latest release -> ~/.local/bin
 sh install.sh --prefix /usr/local/bin   # system-wide (needs sudo)
-PLOMBIR_VERSION=v0.7.0 sh install.sh    # pin a release
+PLOMBIR_VERSION=v1.0.0 sh install.sh    # pin a release
 ```
 
 Or download `plombir-linux-x86_64.tar.gz` from the
 [releases page](https://github.com/the-cry-labs/plombir/releases)
 yourself, extract `plombir`, and put it on your `PATH`. The binary
 is statically linked: zero runtime dependencies, any output of
-`plombir --version` names its commit (`plombir 0.7.0 (336e3d4)`).
+`plombir --version` names its commit (`plombir 1.0.0 (336e3d4)`).
 
 ## From source
 

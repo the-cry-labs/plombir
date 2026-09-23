@@ -8,7 +8,7 @@
 <h1 align="center">Plombir</h1>
 
 <p align="center">
-  <a href="#readme"><img src="https://img.shields.io/badge/version-0.7.0-black" alt="Version"></a>
+  <a href="#readme"><img src="https://img.shields.io/badge/version-1.0.0-black" alt="Version"></a>
   <a href="#readme"><img src="https://img.shields.io/badge/crystal-%3E%3D_1.21-black" alt="Crystal"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MPL--2.0-black" alt="License"></a>
   <a href="https://shardbox.org/shards/plombir"><img src="https://img.shields.io/badge/shardbox-plombir-black" alt="Shardbox"></a>

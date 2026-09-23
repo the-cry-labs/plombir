@@ -33,26 +33,41 @@ Brand reminder (§34): modern, sharp, minimal, premium developer tool. Subtle pl
 
 ---
 
-## 1. Current state — Phase 5 done and tagged (Phase 6 next, not started)
+## 1. Current state — Phases 0–6 done, Jekyll parity landed (v1.0 next)
 
-Phase 5 is done and tagged (`v0.6.0-assets-seo`): fingerprinted
-`assets/` + manifest + `public/`-wins merge, `| asset_url` filter +
-idempotent `/assets/…` rewrite + `build --strict`, `{{ seo_head }}`
-(title/description/canonical/OG/Twitter/JSON-LD), `sitemap.xml` +
-`robots.txt` + `rss.xml`, `check` SEO rules (missing `site.url`,
-missing description, title >60), safe `build --minify`, `assets-site`
-+ `seo-site` goldens, `docs/assets.md` + `docs/seo.md`, and a frozen
-golden clock.
+Phase 6 is done: 20-case error audit (`spec/errors/audit_spec.cr`),
+`spec/e2e/` lifecycle + 200-page budget specs, full-pass
+`docs/benchmarks.md` (re-run post-parity on 2026-09-23: minimal 7ms
+wall, 200-page 24ms wall), the full `docs/` set, release workflow
+with Linux x86_64/ARM64 artifacts + `install.sh`, `--version` with
+baked-in commit, and a polished `new` scaffold that passes `check`
+on day one (one by-design SEO warning until `site.url` is set).
+
+Jekyll parity also landed, one ADR + reviewable PR per slice:
+
+- Pagination (ADR-007, PR #67): `paginate:` frontmatter, page
+  siblings, `paginator.*` vars, sitemap coverage.
+- Taxonomies (ADR-008, PR #68): `tags:` + `categories:`/`category:`,
+  layout-gated `/tags/` + `/categories/` archives (no layouts → no
+  pages, existing builds byte-identical).
+- Data files (ADR-009, PR #69): `_data/*.yml|yaml|json` →
+  `data.*` + `site.data.*`, `Watcher::Kind::Data` full-rebuild.
+- Future posts + import (ADR-010, PR #70): `--future` on
+  `build`/`dev`, `plombir import <src> [<name>]` for posts, pages,
+  data, and basic config (Liquid stays manual).
 
 What exists: CLI (`new`, `dev`, `build`, `preview`, `check`, `clean`,
-`doctor`), Markdown subset (ADR-001), frontmatter with defaults
-(ADR-002), pretty-URL router, collections + schemas + permalinks +
-`check` v1 (now with SEO rules), template language v1 (seven filters
-with `asset_url` — ADR-006, `docs/templates.md`), `{{ seo_head }}`
-layouts, fingerprinted assets + feeds + sitemap/robots, build
-pipeline (full + incremental, `--strict`/`--minify`), 397 green
-specs, CI (format + spec + release build).
-What is missing: hardening + docs site + release binary (Phase 6).
+`doctor`, `import`), Markdown subset (ADR-001), frontmatter with
+defaults (ADR-002), pretty-URL router, collections + schemas +
+permalinks + `check` v1 (with SEO rules), template language v1
+(seven filters with `asset_url` — ADR-006, `docs/templates.md`),
+`{{ seo_head }}` layouts, fingerprinted assets + feeds +
+sitemap/robots, build pipeline (full + incremental,
+`--strict`/`--minify`/`--drafts`/`--future`), pagination siblings,
+opt-in taxonomy archives, `_data` vars, 453 green specs, CI (format
++ spec + release build on 1.21 and latest).
+What is missing: the v1.0 tag + announcement (§9.2); then Phase 7
+tracking opens.
 
 ---
 
@@ -350,11 +365,11 @@ Tag `v0.6.0-assets-seo`. `docs/assets.md` + `docs/seo.md` written.
 
 ### 9.2 v1.0 definition of done
 
-- [ ] All Phase 0–5 acceptance boxes ticked.
-- [ ] `crystal spec` green, `crystal tool format --check` green, CI green on `1.21.x`.
-- [ ] Fresh-user test: new user goes `new → dev → build → deploy dist/` in <10 min with no help.
-- [ ] No `TODO`/`FIXME` in user paths; error gallery in docs matches actual output.
-- [ ] Binary runs with zero runtime deps; `doctor` passes on clean checkout.
+- [x] All Phase 0–5 acceptance boxes ticked.
+- [x] `crystal spec` green, `crystal tool format --check` green, CI green on `1.21.x`.
+- [x] Fresh-user test: new user goes `new → dev → build → deploy dist/` in <10 min with no help (verified 2026-09-23 on `/tmp/fresh`: `new` ✓, `build` 3 pages ✓, `check` 1 by-design SEO warning ✓, `dev` + `preview` HTTP 200 ✓, `clean` ✓, `doctor` all-pass ✓).
+- [x] No `TODO`/`FIXME` in user paths; error gallery in docs matches actual output.
+- [x] Binary runs with zero runtime deps; `doctor` passes on clean checkout.
 
 Tag `v1.0.0`. Announce. Then — and only then — open Phase 7 tracking.
 
@@ -370,7 +385,7 @@ Each item below lists the *seam* to preserve during Phases 0–6.
 - [ ] **Framework adapters** (React/Vue/Svelte): components stay HTML-first and framework-independent (§26). No adapters in v1.
 - [ ] **Search / Analytics / CMS:** content model keeps stable `url/title/excerpt/date/tags` so indexers plug in later. No integrations in v1.
 - [ ] **Plugin system:** pipeline stages take `(Context)` and return `(Result)` so a future `Plugin` hook (`before_build/after_render/…`) wraps them without refactor. No plugin API in v1.
-- [ ] **Advanced schemas/taxonomies/pagination/i18n:** collections keep `schema?`, `permalink?`, `filter/sort` seams. Ship only §6 scope in v1.
+- [ ] **Advanced schemas/i18n (+ future pagination/taxonomy extensions):** collections keep `schema?`, `permalink?`, `filter/sort` seams. v1 ships pagination (ADR-007), layout-gated taxonomies (ADR-008), `_data` files (ADR-009), `--future` + `import` (ADR-010); further extensions need ADRs.
 
 Rule: if a Phase 0–6 decision would close one of these seams, stop and write an ADR first.
 
@@ -379,8 +394,9 @@ Rule: if a Phase 0–6 decision would close one of these seams, stop and write a
 
 ### 11.1 CLI contract (§5)
 
-Commands: `new <name> | dev | build | preview | check | clean | doctor` (+ future `add/init/version` — help mentions only).
+Commands: `new <name> | dev | build | preview | check | clean | doctor | import <src> [<name>]` (+ future `add/init/version` — help mentions only).
 Global flags: `--help -h`, `--version -V`, `--verbose -v`, `--quiet -q`, `--no-color`.
+`build`/`dev` accept `--drafts`/`--future`; `build` accepts `--strict`/`--minify`/`--output`.
 Exit codes: `0` ok · `1` user/project error (with fix hint) · `2` usage error.
 Output rules: human-friendly one-line successes, `✓/✖/↻` glyphs, `Built in Nms / Output: dist/`, timings always, no stack traces without `--verbose`.
 Every command has `--help` with examples.
