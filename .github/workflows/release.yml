@@ -56,7 +56,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: plombir-linux-aarch64.tar.gz
-          generate_release_notes: true
+          # Notes generated once by the linux job; duplicates append here.
 
   macos:
     runs-on: macos-latest
@@ -81,4 +81,4 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: plombir-macos-arm64.tar.gz
-          generate_release_notes: true
+          # Notes generated once by the linux job; duplicates append here.

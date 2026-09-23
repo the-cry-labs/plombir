@@ -33,7 +33,7 @@ Brand reminder (§34): modern, sharp, minimal, premium developer tool. Subtle pl
 
 ---
 
-## 1. Current state — Phases 0–6 done, Jekyll parity landed (v1.0 next)
+## 1. Current state — v1.0.0 shipped, Phase 7 tracking next
 
 Phase 6 is done: 20-case error audit (`spec/errors/audit_spec.cr`),
 `spec/e2e/` lifecycle + 200-page budget specs, full-pass
@@ -66,7 +66,7 @@ sitemap/robots, build pipeline (full + incremental,
 `--strict`/`--minify`/`--drafts`/`--future`), pagination siblings,
 opt-in taxonomy archives, `_data` vars, 453 green specs, CI (format
 + spec + release build on 1.21 and latest).
-What is missing: the v1.0 tag + announcement (§9.2); then Phase 7
+What is missing: the v1.0 announcement (§9.2); then Phase 7
 tracking opens.
 
 ---
@@ -371,7 +371,9 @@ Tag `v0.6.0-assets-seo`. `docs/assets.md` + `docs/seo.md` written.
 - [x] No `TODO`/`FIXME` in user paths; error gallery in docs matches actual output.
 - [x] Binary runs with zero runtime deps; `doctor` passes on clean checkout.
 
-Tag `v1.0.0`. Announce. Then — and only then — open Phase 7 tracking.
+Tag `v1.0.0` is pushed and the release ships three artifacts
+(Linux x86_64/ARM64, macOS ARM64). Announce. Then — and only
+then — open Phase 7 tracking.
 
 ---
 ## 10. Phase 7+ — Explicitly deferred (design for, do not build)

@@ -1,11 +1,11 @@
 #!/bin/sh
-# Installs the plombir release binary (Linux x86_64 and ARM64).
+# Installs the plombir release binary (Linux x86_64/ARM64, macOS ARM64).
 #
 #   sh install.sh                          # latest release -> ~/.local/bin
 #   sh install.sh --prefix /usr/local/bin  # system-wide (needs sudo)
 #   PLOMBIR_VERSION=v1.0.0 sh install.sh   # pin a release
 #
-# macOS / other platforms: build from source (see docs/installation.md).
+# macOS (Intel): build from source (see docs/installation.md) — no prebuilt asset yet.
 # Env overrides (testing): PLOMBIR_RELEASE_BASE, PLOMBIR_VERSION.
 set -eu
 
@@ -19,6 +19,7 @@ OS="$(uname -s)"; ARCH="$(uname -m)"
 case "$OS/$ARCH" in
   Linux/x86_64) ASSET="plombir-linux-x86_64.tar.gz" ;;
   Linux/aarch64 | Linux/arm64) ASSET="plombir-linux-aarch64.tar.gz" ;;
+  Darwin/arm64) ASSET="plombir-macos-arm64.tar.gz" ;;
   *)
     echo "error: no prebuilt binary for $OS/$ARCH - build from source:" >&2
     echo "  git clone https://github.com/the-cry-labs/plombir && cd plombir && shards install && shards build --release" >&2

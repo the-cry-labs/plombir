@@ -1,6 +1,6 @@
 # Installation
 
-## From a release binary (Linux x86_64 and ARM64)
+## From a release binary (Linux x86_64/ARM64, macOS ARM64)
 
 ```bash
 sh install.sh                  # latest release -> ~/.local/bin
@@ -8,7 +8,8 @@ sh install.sh --prefix /usr/local/bin   # system-wide (needs sudo)
 PLOMBIR_VERSION=v1.0.0 sh install.sh    # pin a release
 ```
 
-Or download `plombir-linux-x86_64.tar.gz` from the
+Or download `plombir-linux-x86_64.tar.gz` (`-aarch64` on ARM64
+Linux, `plombir-macos-arm64.tar.gz` on Apple Silicon) from the
 [releases page](https://github.com/the-cry-labs/plombir/releases)
 yourself, extract `plombir`, and put it on your `PATH`. The binary
 is statically linked: zero runtime dependencies, any output of
@@ -16,7 +17,7 @@ is statically linked: zero runtime dependencies, any output of
 
 ## From source
 
-macOS, other platforms, or hacking on Plombir itself.
+macOS (Intel), other platforms, or hacking on Plombir itself.
 
 Prerequisites: Crystal `>= 1.21.0` and Shards (`>= 0.20.0`).
 
