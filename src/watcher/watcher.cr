@@ -15,6 +15,7 @@ module Plombir
       Asset   # assets/** — passthrough / affected pages
       Config  # plombir.yml — full rebuild
       Public  # public/** — copy through
+      Data    # _data/** — full rebuild (every page can read it)
     end
 
     # How the file changed between two snapshots.
@@ -54,6 +55,7 @@ module Plombir
       when "layouts" then Kind::Layout
       when "assets"  then Kind::Asset
       when "public"  then Kind::Public
+      when "_data"   then Kind::Data
       else
         Kind::Config if path == "plombir.yml"
       end

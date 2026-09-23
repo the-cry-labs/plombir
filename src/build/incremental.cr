@@ -169,6 +169,9 @@ module Plombir
           if kinds.includes?(Watcher::Kind::Public) || kinds.includes?(Watcher::Kind::Asset)
             return full_as(Tier::Full, "public assets changed", started)
           end
+          if kinds.includes?(Watcher::Kind::Data)
+            return full_as(Tier::Full, "_data changed", started)
+          end
           if paginated_site?
             return full_as(Tier::Full, "pagination changed", started)
           end
@@ -273,6 +276,7 @@ module Plombir
           entries = Pipeline.discover(@context)
           routes = Pipeline.resolve(entries, @context.patterns)
           collections = Pipeline.collection_vars(entries, routes)
+          content_data = Content::Data.load(@context.root)
           assets = Assets::Manifest.read(@context.output_dir) || {} of String => String
           files = targets.map do |relative|
             started = Time.instant
@@ -280,7 +284,7 @@ module Plombir
             route = routes[relative]
             destination = File.join(@context.output_dir, route.output_path)
             Dir.mkdir_p(File.dirname(destination))
-            File.write(destination, Pipeline.render_one(entry, route, @context, collections, nil, nil, assets, [] of String))
+            File.write(destination, Pipeline.render_one(entry, route, @context, collections, nil, nil, assets, [] of String, {} of String => Renderer::Page::Value, content_data))
 
             record = graph.pages[relative]
             old_layout = record.layout

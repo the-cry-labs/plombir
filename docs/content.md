@@ -158,6 +158,31 @@ Term pages get `taxonomy.type/slug/name` + `taxonomy.items`
 sitemap includes archives; `dev` takes the full-rebuild path when
 taxonomy layouts exist.
 
+## Data files
+
+`_data/<name>.yml` (or `.yaml`/`.json`) becomes `data.<name>.*`
+plus a `site.data.<name>.*` alias (see `adr/009-data-files.md`).
+Mappings flatten with dots, sequences bind whole for loops, numbers
+stringify. The directory is optional — absent means no vars.
+
+```yaml
+# _data/nav.yml
+- name: Home
+  url: /
+- name: Blog
+  url: /blog/
+```
+
+```html
+{% for link in data.nav %}<a href="{{ link.url }}">{{ link.name }}</a>{% end %}
+<p>{{ data.authors.lead.name }} / {{ site.data.authors.lead.name }}</p>
+```
+
+Bad YAML/JSON or deep shapes (nested arrays, maps with array
+values) fail with `file` + key path + fix; two files sharing a
+basename fail fast. `dev` full-rebuilds on `_data/` changes and
+reloads data fresh on tiered rebuilds.
+
 ## Check
 
 `plombir check [--strict]` runs five sections — Content, Routes,

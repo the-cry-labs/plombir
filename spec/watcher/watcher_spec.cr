@@ -8,6 +8,7 @@ describe Plombir::Watcher do
       Plombir::Watcher.classify("assets/app.css").should eq(Plombir::Watcher::Kind::Asset)
       Plombir::Watcher.classify("plombir.yml").should eq(Plombir::Watcher::Kind::Config)
       Plombir::Watcher.classify("public/notes.txt").should eq(Plombir::Watcher::Kind::Public)
+      Plombir::Watcher.classify("_data/nav.yml").should eq(Plombir::Watcher::Kind::Data)
     end
 
     it "ignores generated output, dotfiles, strays, and backups" do
