@@ -1,13 +1,28 @@
-# Plombir
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/plombir.svg">
+    <img src="assets/plombir.svg" alt="Plombir logo" width="120" height="120">
+  </picture>
+</p>
 
-![Version](https://img.shields.io/badge/version-0.7.0-black)
-![Crystal](https://img.shields.io/badge/crystal-%3E%3D_1.21-black)
-[![License](https://img.shields.io/badge/license-MPL--2.0-black)](LICENSE)
-[![Shardbox](https://img.shields.io/badge/shardbox-plombir-black)](https://shardbox.org/shards/plombir)
+<h1 align="center">Plombir</h1>
 
-A modern, extremely fast static site generator written in **Crystal**.
+<p align="center">
+  <a href="#readme"><img src="https://img.shields.io/badge/version-0.7.0-black" alt="Version"></a>
+  <a href="#readme"><img src="https://img.shields.io/badge/crystal-%3E%3D_1.21-black" alt="Crystal"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MPL--2.0-black" alt="License"></a>
+  <a href="https://shardbox.org/shards/plombir"><img src="https://img.shields.io/badge/shardbox-plombir-black" alt="Shardbox"></a>
+</p>
 
-> **Write. Build. Ship.**
+<p align="center">
+  A modern, extremely fast static site generator written in <strong>Crystal</strong>.
+</p>
+
+<p align="center">
+  <em>Write. Build. Ship.</em>
+</p>
+
+---
 
 Plombir combines Jekyll-style simplicity (Markdown, frontmatter, layouts,
 convention over configuration) with a modern content model, compiled to a
