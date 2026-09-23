@@ -1,17 +1,18 @@
 module Plombir
   module CLI
-    # Implements `plombir build [--output dist] [--drafts] [--strict] [--minify]`.
+    # Implements `plombir build [--output dist] [--drafts] [--future] [--strict] [--minify]`.
     module Build
       def self.text : String
         String.build do |io|
           io << "Usage:\n"
-          io << "  plombir build [--output <dir>] [--drafts] [--strict] [--minify]\n"
+          io << "  plombir build [--output <dir>] [--drafts] [--future] [--strict] [--minify]\n"
           io << "\n"
           io << "Build the site in the current directory into static HTML.\n"
           io << "\n"
           io << "Options:\n"
           io << "  --output <dir>  Output directory (default: dist)\n"
           io << "  --drafts        Include drafts and _-prefixed pages\n"
+          io << "  --future        Include posts dated after now\n"
           io << "  --strict        Fail on asset warnings (missing refs, public/ shadows)\n"
           io << "  --minify        Collapse safe HTML whitespace (comments, blank lines)\n"
           io << "\n"
@@ -34,6 +35,7 @@ module Plombir
         output = "dist"
         output_flag = false
         drafts = false
+        future = false
         strict = false
         minify = false
         rest = args.dup
@@ -41,6 +43,9 @@ module Plombir
           case rest.first
           when "--drafts"
             drafts = true
+            rest.shift
+          when "--future"
+            future = true
             rest.shift
           when "--strict"
             strict = true
@@ -69,7 +74,7 @@ module Plombir
 
         config = Plombir::Config.load_with_warnings(directory, error)
         output = config.build.output unless output_flag
-        context = Plombir::Build::Context.new(directory, output, drafts, config.schemas, config.permalink_patterns, config.site, minify)
+        context = Plombir::Build::Context.new(directory, output, drafts, config.schemas, config.permalink_patterns, config.site, minify, future)
         result = Plombir::Build::Pipeline.run(context)
         if strict && !result.warnings.empty?
           error.puts "✖ Asset warnings (--strict)"
@@ -82,7 +87,7 @@ module Plombir
         result.warnings.each { |warning| error.puts "! #{warning}" }
         print_summary(result, io)
         0
-      rescue ex : Plombir::Build::Error | Plombir::Frontmatter::Error | Plombir::Router::Conflict | Plombir::Renderer::LayoutNotFound
+      rescue ex : Plombir::Build::Error | Plombir::Frontmatter::Error | Plombir::Router::Conflict | Plombir::Renderer::LayoutNotFound | Plombir::Content::Data::Error
         error.puts ex.message
         1
       rescue ex : Plombir::Config::Error

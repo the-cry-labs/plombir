@@ -20,7 +20,7 @@ plombir new /tmp/my-site
 Prints next steps (`cd`, `plombir dev`). Fails when the directory
 already exists — pick another name or remove it.
 
-## `plombir dev [--port <n>] [--host <addr>]`
+## `plombir dev [--port <n>] [--host <addr>] [--future]`
 
 Build, serve `dist/`, and rebuild affected pages on change.
 Defaults: port `3000`, host `127.0.0.1`.
@@ -34,9 +34,10 @@ Startup prints the URL, page count, and watch roots; each rebuild
 logs `↻ rebuilt <source> → <url> in Nms` (page tier) or a one-line
 `(full)` summary. Content errors print inline and keep serving the
 last-good output. `Ctrl+C` stops cleanly. A taken port reports
-`Port 3000 in use. Try --port 3001`.
+`Port 3000 in use. Try --port 3001`. `--future` includes posts dated
+after now (see `content.md`).
 
-## `plombir build [--output <dir>] [--drafts] [--strict] [--minify]`
+## `plombir build [--output <dir>] [--drafts] [--future] [--strict] [--minify]`
 
 Build the site into static HTML (default output `dist/`).
 
@@ -46,6 +47,7 @@ plombir build --output dist --drafts
 ```
 
 - `--drafts`: include drafts and `_`-prefixed pages.
+- `--future`: include posts dated after now.
 - `--strict`: fail on asset warnings (missing refs, `public/`
   shadowing a generated file).
 - `--minify`: collapse safe HTML whitespace (comments, blank lines).
@@ -66,6 +68,15 @@ missing.
 Validate content, routes, links, assets, and SEO without touching
 `dist/`. Prints five sections (see `content.md` and `seo.md`);
 errors fail, warnings fail only with `--strict`.
+
+## `plombir import <source> [<name>]`
+
+Convert a Jekyll site into a new Plombir site. Posts
+(`_posts/YYYY-MM-DD-slug.md`, filename date injected when
+frontmatter lacks one), pages, `_data/` files, and basic
+`_config.yml` keys convert; layouts stay scaffold-default because
+Liquid is not converted — adapt `layouts/` by hand, move images and
+styles into `assets/` or `public/`, then run `check` and `build`.
 
 ## `plombir clean`
 

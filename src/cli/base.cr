@@ -29,6 +29,8 @@ module Plombir
         Doctor.run(positional[1..])
       when "check"
         Check.run(positional[1..])
+      when "import"
+        Import.run(positional[1..])
       else
         STDERR.puts "✖ Unknown command: #{command}"
         STDERR.puts ""

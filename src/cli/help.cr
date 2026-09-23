@@ -15,6 +15,7 @@ module Plombir
           io << "  build        Build the site into dist/\n"
           io << "  preview      Serve the built site locally\n"
           io << "  check        Validate content, routes, links and assets\n"
+          io << "  import <src> Convert a Jekyll site into a new site\n"
           io << "  clean        Remove generated output\n"
           io << "  doctor       Diagnose the environment and project\n"
           io << "  version      Print the version\n"

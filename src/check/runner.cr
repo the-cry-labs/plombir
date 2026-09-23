@@ -27,7 +27,7 @@ module Plombir
           issues.concat(LinksCheck.check(tmp))
           issues.concat(AssetsCheck.check(tmp))
           issues.concat(SeoCheck.check(tmp, config.site.url))
-        rescue ex : Build::Error | Frontmatter::Error | Router::Conflict | Renderer::LayoutNotFound
+        rescue ex : Build::Error | Frontmatter::Error | Router::Conflict | Renderer::LayoutNotFound | Content::Data::Error
           issues << Issue.new(Severity::Error, "Content", "<build>", "Build failed during check: #{ex.message}", "Fix the error above and rerun `plombir check`.")
         ensure
           FileUtils.rm_rf(tmp)
