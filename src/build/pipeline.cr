@@ -147,6 +147,7 @@ module Plombir
         warnings = assets.warnings.dup
         render_all(entries, routes, context, assets.files, warnings, collections, extras, taxo, content_data)
         write_seo_files(entries, routes, context, extras, taxo)
+        write_search_index(entries, routes, context, extras, taxo)
         copy_public(context)
 
         Result.new(routes.size + extras.size + taxo.size, (Time.instant - started).total_milliseconds.to_i64, context.output, assets.files.size, warnings)
@@ -511,6 +512,15 @@ module Plombir
         Seo::Robots.write(context.output_dir, context.site.url)
         items = feed_items(entries, routes)
         Feeds::Rss.write(context.output_dir, items, context.site) unless items.empty?
+      end
+
+      # Writes `search.json` covering every HTML route (content,
+      # pagination siblings, taxonomy archives — the sitemap set).
+      # Root file by design, so `public/search.json` overrides it
+      # later (see ADR-011). An index, not a page: excluded from
+      # `Result.pages`.
+      private def self.write_search_index(entries : Array(Entry), routes : Hash(String, Router::Route), context : Context, extras : Array(Extra) = [] of Extra, taxo : Array(TaxoPage) = [] of TaxoPage) : Nil
+        Search::Index.write(context.output_dir, Search::Index.rows(entries, routes, extras, taxo))
       end
 
       # `posts` entries newest-first (same ordering as

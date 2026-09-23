@@ -106,6 +106,7 @@ on Crystal `1.21` and `latest`.
 - `docs/templates.md`: template language, filters, components, error gallery.
 - `docs/assets.md`: `assets/` vs `public/`, fingerprinting.
 - `docs/seo.md`: meta tags, sitemap, feeds.
+- `docs/search.md`: build-time index, `/search/` page, validation.
 - `docs/benchmarks.md`: measured timings and budgets.
 - `roadmap.md`: what gets built, in what order, and what "done" means.
 - `agents.md`: how to work in this repo (commands, style, tests, PR rules).

@@ -17,7 +17,7 @@ describe Plombir::Content::Collection do
         collections = Plombir::Content::Collection.all(root)
 
         collections.map(&.name).should eq(["pages", "posts", "root"])
-        collections.find! { |c| c.name == "root" }.documents.map(&.relative_path).should eq(["index.md"])
+        collections.find! { |c| c.name == "root" }.documents.map(&.relative_path).should eq(["index.md", "search.md"])
         collections.find! { |c| c.name == "pages" }.documents.map(&.relative_path).should eq(["pages/about.md"])
         collections.find! { |c| c.name == "posts" }.documents.map(&.relative_path).should eq(["posts/hello-world.md"])
       end
@@ -30,10 +30,10 @@ describe Plombir::Content::Collection do
         File.write(File.join(root, "content", "posts", "wip.md"), "---\ntitle: W\ndraft: true\n---\n\n# W\n")
 
         plain = Plombir::Content::Collection.all(root)
-        plain.sum(&.documents.size).should eq(3)
+        plain.sum(&.documents.size).should eq(4)
 
         with_drafts = Plombir::Content::Collection.all(root, drafts: true)
-        with_drafts.sum(&.documents.size).should eq(5)
+        with_drafts.sum(&.documents.size).should eq(6)
         with_drafts.find! { |c| c.name == "root" }.documents.map(&.relative_path).should contain("_secret.md")
       end
     end

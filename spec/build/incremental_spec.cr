@@ -29,14 +29,15 @@ describe Plombir::Build::Incremental do
         context = Plombir::Build::Context.new(root)
         result = Plombir::Build::Incremental::Rebuilder.new(context).full
 
-        result.pages.should eq(3)
+        result.pages.should eq(4)
         cache = File.join(root, ".plombir", "cache.json")
         File.exists?(cache).should be_true
         graph = Plombir::Build::Incremental::DependencyGraph.load(cache).not_nil!
         graph.version.should eq(1)
-        graph.pages.keys.sort.should eq(["index.md", "pages/about.md", "posts/hello-world.md"])
+        graph.pages.keys.sort.should eq(["index.md", "pages/about.md", "posts/hello-world.md", "search.md"])
         graph.consumers("post").should eq(["posts/hello-world.md"])
         graph.consumers("default").sort.should eq(["index.md", "pages/about.md"])
+        graph.consumers("search").should eq(["search.md"])
       end
     end
 
@@ -82,6 +83,24 @@ describe Plombir::Build::Incremental do
       end
     end
 
+    it "refreshes search.json on tiered content rebuilds" do
+      with_tempdir do |dir|
+        root = Plombir::Scaffold::Site.new("site", dir).create
+        context = Plombir::Build::Context.new(root)
+        rebuilder = Plombir::Build::Incremental::Rebuilder.new(context)
+        rebuilder.full
+
+        post = File.join(root, "content", "posts", "hello-world.md")
+        File.write(post, File.read(post).sub("Hello, world", "Hello, edited world"))
+        report = rebuilder.rebuild([inc_event("content/posts/hello-world.md")])
+
+        report.tier.should eq(Plombir::Build::Incremental::Tier::Page)
+        index = Array(Plombir::Search::Index::Row).from_json(File.read(File.join(root, "dist", "search.json")))
+        index.map(&.url).should eq(["/", "/pages/about/", "/posts/hello-world/", "/search/"])
+        index.find! { |row| row.url == "/posts/hello-world/" }.title.should eq("Hello, edited world")
+      end
+    end
+
     it "rebuilds only layout consumers on layout change" do
       with_tempdir do |dir|
         root = Plombir::Scaffold::Site.new("site", dir).create
@@ -116,13 +135,13 @@ describe Plombir::Build::Incremental do
         File.write(added, "---\ntitle: New\nlayout: default\n---\n\n# New\n")
         report = rebuilder.rebuild([inc_event("content/pages/new.md", Plombir::Watcher::Change::Created)])
         report.tier.should eq(Plombir::Build::Incremental::Tier::Full)
-        report.pages.should eq(4)
+        report.pages.should eq(5)
         File.exists?(File.join(root, "dist", "pages", "new", "index.html")).should be_true
 
         File.delete(added)
         report = rebuilder.rebuild([inc_event("content/pages/new.md", Plombir::Watcher::Change::Deleted)])
         report.tier.should eq(Plombir::Build::Incremental::Tier::Full)
-        report.pages.should eq(3)
+        report.pages.should eq(4)
 
         report = rebuilder.rebuild([inc_event("plombir.yml")])
         report.tier.should eq(Plombir::Build::Incremental::Tier::Full)
@@ -161,7 +180,7 @@ describe Plombir::Build::Incremental do
         report = rebuilder.rebuild([inc_event("content/index.md")])
 
         report.tier.should eq(Plombir::Build::Incremental::Tier::Full)
-        report.pages.should eq(3)
+        report.pages.should eq(4)
         Plombir::Build::Incremental::DependencyGraph.load(File.join(root, ".plombir", "cache.json")).should_not be_nil
       end
     end

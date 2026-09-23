@@ -19,8 +19,10 @@ module Plombir
         when :index          then index
         when :hello_world    then hello_world
         when :about          then about
+        when :search         then search_page
         when :layout_default then layout_default
         when :layout_post    then layout_post
+        when :layout_search  then layout_search
         when :stylesheet     then stylesheet
         when :config         then config
         when :gitignore      then gitignore
@@ -44,6 +46,7 @@ module Plombir
 
         - Read the [about page](/pages/about/)
         - Read the [first post](/posts/hello-world/)
+        - [Search](/search/) the site
         MARKDOWN
       end
 
@@ -77,6 +80,82 @@ module Plombir
 
         Tell the world what `{{name}}` is about.
         MARKDOWN
+      end
+
+      private def self.search_page : String
+        <<-MARKDOWN
+        ---
+        title: Search
+        description: Search this site.
+        layout: search
+        ---
+
+        # Search
+
+        Type below to filter every page by title, excerpt, or tag.
+        MARKDOWN
+      end
+
+      private def self.layout_search : String
+        <<-HTML
+        <!DOCTYPE html>
+        <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            {{ seo_head }}
+            <link rel="stylesheet" href="/assets/style.css">
+          </head>
+          <body>
+            <main>
+              {{ content }}
+              <form action="/search/" method="get" role="search">
+                <label for="q">Search</label>
+                <input type="search" id="q" name="q" autocomplete="off">
+              </form>
+              <noscript>
+                <p>Search needs JavaScript. Meanwhile, browse from the <a href="/">home page</a>.</p>
+              </noscript>
+              <ul id="results"></ul>
+              <script>
+                // Filters the build-time search.json index as you type.
+                // No requests beyond the one index fetch; nothing to configure.
+                var input = document.getElementById("q");
+                var list = document.getElementById("results");
+                var pages = [];
+                function matches(page, query) {
+                  var hay = (page.title + " " + page.excerpt + " " + page.tags.join(" ")).toLowerCase();
+                  return query.split(" ").every(function (word) { return hay.indexOf(word) !== -1; });
+                }
+                function render(query) {
+                  list.innerHTML = "";
+                  if (!query) return;
+                  var words = query.toLowerCase();
+                  pages.filter(function (page) { return matches(page, words); }).slice(0, 20).forEach(function (page) {
+                    var item = document.createElement("li");
+                    var link = document.createElement("a");
+                    link.href = page.url;
+                    link.textContent = page.title;
+                    item.appendChild(link);
+                    list.appendChild(item);
+                  });
+                  if (!list.children.length) {
+                    var empty = document.createElement("li");
+                    empty.textContent = "No pages match.";
+                    list.appendChild(empty);
+                  }
+                }
+                fetch("../search.json").then(function (response) { return response.json(); }).then(function (data) {
+                  pages = data;
+                  var preset = new URLSearchParams(window.location.search).get("q");
+                  if (preset) { input.value = preset; render(preset); }
+                });
+                input.addEventListener("input", function (event) { render(event.target.value); });
+              </script>
+            </main>
+          </body>
+        </html>
+        HTML
       end
 
       private def self.layout_default : String

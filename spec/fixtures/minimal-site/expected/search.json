@@ -1,0 +1,25 @@
+[
+  {
+    "url": "/",
+    "title": "Minimal site",
+    "excerpt": "A tiny site that proves the vertical slice.",
+    "date": "2026-01-02",
+    "tags": []
+  },
+  {
+    "url": "/about/",
+    "title": "About",
+    "excerpt": "About this tiny site.",
+    "date": "2026-01-04",
+    "tags": []
+  },
+  {
+    "url": "/posts/hello/",
+    "title": "Hello",
+    "excerpt": "First post.",
+    "date": "2026-01-03",
+    "tags": [
+      "hello"
+    ]
+  }
+]

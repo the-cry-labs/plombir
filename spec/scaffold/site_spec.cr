@@ -9,8 +9,10 @@ describe Plombir::Scaffold::Site do
         content/index.md
         content/posts/hello-world.md
         content/pages/about.md
+        content/search.md
         layouts/default.html
         layouts/post.html
+        layouts/search.html
         components/.gitkeep
         assets/images/.gitkeep
         public/assets/style.css
@@ -76,6 +78,7 @@ describe Plombir::Scaffold::Site do
 
       index.should contain("/pages/about/")
       index.should contain("/posts/hello-world/")
+      index.should contain("/search/")
     end
   end
 

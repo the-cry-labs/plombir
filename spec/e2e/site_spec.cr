@@ -12,12 +12,14 @@ describe "E2E site lifecycle" do
 
       build_io, build_err = IO::Memory.new, IO::Memory.new
       Plombir::CLI::Build.call([] of String, root, build_io, build_err).should eq(0)
-      build_io.to_s.should contain("✓ Rendered 3 pages")
+      build_io.to_s.should contain("✓ Rendered 4 pages")
 
       dist = File.join(root, "dist")
       File.exists?(File.join(dist, "index.html")).should be_true
       File.exists?(File.join(dist, "posts", "hello-world", "index.html")).should be_true
       File.exists?(File.join(dist, "pages", "about", "index.html")).should be_true
+      File.exists?(File.join(dist, "search", "index.html")).should be_true
+      File.exists?(File.join(dist, "search.json")).should be_true
       File.exists?(File.join(dist, "sitemap.xml")).should be_true
       File.exists?(File.join(dist, "robots.txt")).should be_true
 

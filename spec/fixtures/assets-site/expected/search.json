@@ -1,0 +1,23 @@
+[
+  {
+    "url": "/",
+    "title": "Asset Fixture Home",
+    "excerpt": "![Logo](/assets/images/logo.png)\n\nBuilt with fingerprinted assets.",
+    "date": "2026-09-13",
+    "tags": []
+  },
+  {
+    "url": "/about/",
+    "title": "About Assets",
+    "excerpt": "Unreferenced font files still ship in `dist/assets/`.",
+    "date": "2026-09-12",
+    "tags": []
+  },
+  {
+    "url": "/posts/first/",
+    "title": "First Post",
+    "excerpt": "A post so the feed and sitemap have something to list.",
+    "date": "2026-09-10",
+    "tags": []
+  }
+]

@@ -100,7 +100,7 @@ describe Plombir::Content::Schema do
         schemas = {"posts" => {"layout" => Plombir::Content::Schema::FieldRule.new("string", true)}}
         context = Plombir::Build::Context.new(root, "dist", false, schemas)
 
-        Plombir::Build::Pipeline.run(context).pages.should eq(3)
+        Plombir::Build::Pipeline.run(context).pages.should eq(4)
       end
     end
   end

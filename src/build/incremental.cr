@@ -272,6 +272,10 @@ module Plombir
         # Tiered rebuilds reuse the last manifest from `dist/` so the
         # helper and rewrite never regress to un-rewritten HTML; only
         # full builds warn about missing assets (see ADR-006).
+        # `search.json` refreshes here too: tiered rebuilds only run
+        # without pagination siblings or taxonomy archives (those
+        # force full), so content-only rows match a full build
+        # exactly (see ADR-011).
         private def render_targets(targets : Array(String), graph : DependencyGraph) : Array(RebuiltFile)
           entries = Pipeline.discover(@context)
           routes = Pipeline.resolve(entries, @context.patterns)
@@ -299,6 +303,7 @@ module Plombir
 
             RebuiltFile.new(source: relative, url: route.url, elapsed_ms: elapsed(started))
           end
+          Search::Index.write(@context.output_dir, Search::Index.rows(entries, routes))
           files.sort_by(&.source)
         end
 
