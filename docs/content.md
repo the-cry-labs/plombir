@@ -58,6 +58,13 @@ Example:
 date: 2026-09-13
 ```
 
+## Drafts and future posts
+
+`draft: true` pages and `_`-prefixed paths skip the build unless
+`--drafts` is passed. Pages dated after now skip the build unless
+`--future` is passed (`build` and `dev` both accept it); mtime
+defaults are never future. `check` stays future-excluded.
+
 ## Permalinks
 
 Precedence per page: explicit `permalink:` frontmatter, else the
