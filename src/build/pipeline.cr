@@ -138,10 +138,11 @@ module Plombir
         collections = collection_vars(entries, routes)
         extras = build_extras(entries, routes, collections)
         taxo = build_taxonomy(entries, routes, context, extras)
+        content_data = Content::Data.load(context.root)
         prepare_output(context)
         assets = process_assets(context)
         warnings = assets.warnings.dup
-        render_all(entries, routes, context, assets.files, warnings, collections, extras, taxo)
+        render_all(entries, routes, context, assets.files, warnings, collections, extras, taxo, content_data)
         write_seo_files(entries, routes, context, extras, taxo)
         copy_public(context)
 
@@ -295,6 +296,7 @@ module Plombir
         collections : Hash(String, Renderer::Page::Value),
         extras : Array(Extra),
         taxo : Array(TaxoPage) = [] of TaxoPage,
+        content_data : Hash(String, Content::Data::Value) = {} of String => Content::Data::Value,
       ) : Nil
         partials = Renderer::Page.partial_sources(context.layouts_dir)
         components = Renderer::Page.component_sources(context.components_dir)
@@ -303,7 +305,7 @@ module Plombir
           route = routes[entry.page.relative_path]
           missing = [] of String
           paginator = first_vars[entry.page.relative_path]? || {} of String => Renderer::Page::Value
-          html = render_one(entry, route, context, collections, partials, components, manifest, missing, paginator)
+          html = render_one(entry, route, context, collections, partials, components, manifest, missing, paginator, content_data)
           missing.each do |reference|
             warnings << "#{entry.page.relative_path} references missing asset #{reference.inspect} — add it under assets/ (fingerprinted) or public/ (as-is)."
           end
@@ -314,7 +316,7 @@ module Plombir
         end
         extras.each do |extra|
           missing = [] of String
-          html = render_one(extra.entry, extra.route, context, collections, partials, components, manifest, missing, extra.vars)
+          html = render_one(extra.entry, extra.route, context, collections, partials, components, manifest, missing, extra.vars, content_data)
           missing.each do |reference|
             warnings << "#{extra.entry.page.relative_path} references missing asset #{reference.inspect} — add it under assets/ (fingerprinted) or public/ (as-is)."
           end
@@ -324,7 +326,7 @@ module Plombir
           File.write(destination, html)
         end
         taxo.each do |page|
-          html = render_taxonomy(page, context, partials, components, manifest)
+          html = render_taxonomy(page, context, partials, components, manifest, content_data)
           html = Utils::Html.minify(html) if context.minify
           destination = File.join(context.output_dir, page.route.output_path)
           Dir.mkdir_p(File.dirname(destination))
@@ -334,7 +336,8 @@ module Plombir
 
       # Renders one taxonomy archive (term or index) inside its dedicated
       # layout with `taxonomy.*` vars plus standard `title/url/site.*/seo_head`.
-      private def self.render_taxonomy(page : TaxoPage, context : Context, partials : Renderer::Page::Partials, components : Renderer::Page::Components, manifest : Hash(String, String)) : String
+      # *content_data* carries `data.*` vars like content pages get.
+      private def self.render_taxonomy(page : TaxoPage, context : Context, partials : Renderer::Page::Partials, components : Renderer::Page::Components, manifest : Hash(String, String), content_data : Hash(String, Content::Data::Value) = {} of String => Content::Data::Value) : String
         vars = Renderer::Page::Context.new
         vars["title"] = page.title
         vars["description"] = ""
@@ -350,6 +353,7 @@ module Plombir
         vars["taxonomy.slug"] = page.slug
         vars["taxonomy.items"] = page.items
         vars["taxonomy.terms"] = page.terms
+        content_data.each { |key, value| vars[key] = value }
         file = "taxonomy:#{page.route.url}"
         Renderer::Page.render_file("", page.layout, context.layouts_dir, vars, file, nil, partials, components, manifest)
       end
@@ -416,8 +420,10 @@ module Plombir
       # manifest for `| asset_url` and the `/assets/…` rewrite; refs
       # backed by neither `assets/` nor `public/` are collected into
       # *missing* for the caller to warn about. *paginator* carries
-      # `paginator.*` vars for paginated listings (empty otherwise).
-      def self.render_one(entry : Entry, route : Router::Route, context : Context, collections : Hash(String, Renderer::Page::Value) = {} of String => Renderer::Page::Value, partials : Renderer::Page::Partials? = nil, components : Renderer::Page::Components? = nil, assets : Hash(String, String) = {} of String => String, missing : Array(String) = [] of String, paginator : Hash(String, Renderer::Page::Value) = {} of String => Renderer::Page::Value) : String
+      # `paginator.*` vars for paginated listings (empty otherwise);
+      # *content_data* carries `data.*` + `site.data.*` vars (empty
+      # without `_data/`).
+      def self.render_one(entry : Entry, route : Router::Route, context : Context, collections : Hash(String, Renderer::Page::Value) = {} of String => Renderer::Page::Value, partials : Renderer::Page::Partials? = nil, components : Renderer::Page::Components? = nil, assets : Hash(String, String) = {} of String => String, missing : Array(String) = [] of String, paginator : Hash(String, Renderer::Page::Value) = {} of String => Renderer::Page::Value, content_data : Hash(String, Content::Data::Value) = {} of String => Content::Data::Value) : String
         body = Markdown.render(entry.document.body)
         vars = Renderer::Page::Context.new
         slug = Router.slugify(File.basename(entry.page.relative_path, ".md"))
@@ -431,6 +437,7 @@ module Plombir
         vars["site.url"] = context.site.url
         vars["seo_head"] = seo_head(entry, route, slug, context.site, assets)
         collections.each { |key, value| vars[key] = value }
+        content_data.each { |key, value| vars[key] = value }
         paginator.each { |key, value| vars[key] = value }
         layout_line = entry.document.data.has_key?("layout") ? entry.document.line_of("layout") : nil
         rendered = Renderer::Page.render_file(body, entry.document.layout, context.layouts_dir, vars, entry.page.relative_path, layout_line, partials, components, assets)

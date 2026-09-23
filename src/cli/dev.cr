@@ -59,7 +59,7 @@ module Plombir
 
         io.puts ""
         io.puts "Serving #{output}/ at #{config_root.url} (rebuilding on change)"
-        io.puts "Watching content/ layouts/ public/ assets/ plombir.yml for changes"
+        io.puts "Watching content/ layouts/ public/ assets/ _data/ plombir.yml for changes"
         io.puts "Press Ctrl+C to stop"
         watcher = Plombir::Watcher::Watcher.new(directory)
         Signal::INT.trap do
