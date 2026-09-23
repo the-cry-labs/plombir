@@ -38,22 +38,16 @@ jobs:
           generate_release_notes: true
 
   linux-arm:
+    # No job-level `container:` here: JavaScript actions (checkout,
+    # gh-release) cannot run inside Alpine containers on ARM64
+    # runners, so checkout/upload run natively and only the compiler
+    # runs containerized via `docker run` (the image is multi-arch).
     runs-on: ubuntu-24.04-arm
-    container: crystallang/crystal:1.21.0-alpine
     steps:
       - uses: actions/checkout@v4
 
-      - name: Fix git ownership (container runs as root)
-        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
-
-      - name: Install shards
-        run: shards install --frozen
-
-      - name: Install file(1) for the static check
-        run: apk add --no-cache file
-
-      - name: Build static release binary
-        run: shards build --release --static && file bin/plombir
+      - name: Build static release binary (Alpine container)
+        run: docker run --rm -v "$GITHUB_WORKSPACE:/src" -w /src crystallang/crystal:1.21.0-alpine sh -c "git config --global --add safe.directory /src && shards install --frozen && apk add --no-cache file && shards build --release --static && file bin/plombir"
 
       - name: Package
         run: tar czf plombir-linux-aarch64.tar.gz -C bin plombir
