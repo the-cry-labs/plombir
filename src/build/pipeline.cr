@@ -181,9 +181,14 @@ module Plombir
       end
 
       # Whether the page is dated after *now* (see ADR-010). Invalid
-      # dates raise the usual `Frontmatter::Error` — never silently kept.
+      # dates return false here so schema validation keeps reporting
+      # them all-together instead of the discovery failing first.
       private def self.future?(document : Frontmatter::Document, mtime : Time, now : Time) : Bool
-        date = document.date(mtime)
+        date = begin
+          document.date(mtime)
+        rescue Frontmatter::Error
+          return false
+        end
         !date.nil? && date > now
       end
 
