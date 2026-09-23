@@ -11,7 +11,7 @@ It consolidates the full product vision (§1–§42 of the project brief) into a
 How to read this document:
 
 - **Phases 0–6 = MVP to v1.0.** Build in order. Do not skip ahead.
-- **Phase 7+ = explicitly deferred.** Design for them, do not implement them yet.
+- **Phase 7+ = tracked in §10.** One slice per ADR + reviewable PR.
 - Every phase has: Goal → In scope / Out of scope → Work items → Acceptance criteria → Tests → Docs → Exit gate.
 - The engineering rule governing everything: **prefer the simple implementation unless an abstraction has a clear, concrete future benefit.** Every decision must answer: *Does this make Plombir simpler, faster, or more pleasant to use?*
 
@@ -33,7 +33,7 @@ Brand reminder (§34): modern, sharp, minimal, premium developer tool. Subtle pl
 
 ---
 
-## 1. Current state — v1.0.0 shipped, Phase 7 tracking next
+## 1. Current state — v1.0.0 closed, Phase 7 tracking open
 
 Phase 6 is done: 20-case error audit (`spec/errors/audit_spec.cr`),
 `spec/e2e/` lifecycle + 200-page budget specs, full-pass
@@ -66,8 +66,7 @@ sitemap/robots, build pipeline (full + incremental,
 `--strict`/`--minify`/`--drafts`/`--future`), pagination siblings,
 opt-in taxonomy archives, `_data` vars, 453 green specs, CI (format
 + spec + release build on 1.21 and latest).
-What is missing: the v1.0 announcement (§9.2); then Phase 7
-tracking opens.
+What is missing: nothing for v1 — pick the next Phase 7 slice (§10).
 
 ---
 
@@ -82,7 +81,7 @@ tracking opens.
 | **4** | Templates v1 | Solid template language + partials/components v1 | Variables, conditionals, loops, includes, slots, filters, layouts inheritance |
 | **5** | Assets, SEO, feeds | `assets/` vs `public/` pipeline + SEO defaults + RSS/sitemap | Hashed deterministic URLs, meta/OG/canonical/sitemap/robots/RSS out of the box |
 | **6** | Hardening & v1.0 | Quality bar, full test suite, docs site, release binary | All §30–§37 gates pass, benchmarked, deployable to any static host |
-| **7+** | Future (deferred) | Islands, image optimization, Sass/Tailwind/TS, framework adapters, plugins/CMS | Architecture ready, **not implemented** in MVP |
+| **7** | Future (tracked) | Search, image optimization, plugins, islands, integrations — one slice per ADR | §10 slices land individually, §0 gates hold |
 
 Execution strategy (§40): always build the thinnest vertical slice first, then widen. Never build abstractions without a concrete use case.
 
@@ -371,25 +370,107 @@ Tag `v0.6.0-assets-seo`. `docs/assets.md` + `docs/seo.md` written.
 - [x] No `TODO`/`FIXME` in user paths; error gallery in docs matches actual output.
 - [x] Binary runs with zero runtime deps; `doctor` passes on clean checkout.
 
-Tag `v1.0.0` is pushed and the release ships three artifacts
-(Linux x86_64/ARM64, macOS ARM64). Announce. Then — and only
-then — open Phase 7 tracking.
+Tag `v1.0.0` is pushed, three artifacts ship
+(Linux x86_64/ARM64, macOS ARM64), notes rewritten as a real
+announcement (PR #73), `install.sh` covers macOS ARM64.
+v1.0 is closed — Phase 7 tracking is open (§10).
 
 ---
-## 10. Phase 7+ — Explicitly deferred (design for, do not build)
+## 10. Phase 7 — Tracked, one slice at a time
 
-These are **not MVP**. Keep extension points open but ship no implementation in v1.0.
-Each item below lists the *seam* to preserve during Phases 0–6.
+v1.0 is closed, so these are no longer "do not build" — but they
+ship **one slice per ADR + reviewable PR**, same as Jekyll parity
+(ADRs 007–010). Each slice below lists its *seam* (preserved during
+Phases 0–6), scope, and acceptance. Rule: if a slice would close
+another seam, stop and write an ADR first.
 
-- [ ] **Islands / interactivity** (§15): reserve `client:load|idle|visible`-shaped syntax; keep renderer HTML-pure so a later hydration pass needs no rewrite. No JS runtime in v1.
-- [ ] **Image optimization** (§17): keep `assets/` pipeline stage-shaped (decode → transform → emit → manifest) so WebP/AVIF/responsive sizes slot in later. No external CLI requirement in v1.
-- [ ] **Asset integrations** (§25: Tailwind/Sass/TypeScript): keep a `Plugins::AssetProcessor` interface stub-shaped; core never depends on Node. No bundlers in v1.
-- [ ] **Framework adapters** (React/Vue/Svelte): components stay HTML-first and framework-independent (§26). No adapters in v1.
-- [ ] **Search / Analytics / CMS:** content model keeps stable `url/title/excerpt/date/tags` so indexers plug in later. No integrations in v1.
-- [ ] **Plugin system:** pipeline stages take `(Context)` and return `(Result)` so a future `Plugin` hook (`before_build/after_render/…`) wraps them without refactor. No plugin API in v1.
-- [ ] **Advanced schemas/i18n (+ future pagination/taxonomy extensions):** collections keep `schema?`, `permalink?`, `filter/sort` seams. v1 ships pagination (ADR-007), layout-gated taxonomies (ADR-008), `_data` files (ADR-009), `--future` + `import` (ADR-010); further extensions need ADRs.
+### 10.1 Search
 
-Rule: if a Phase 0–6 decision would close one of these seams, stop and write an ADR first.
+Seam: content model keeps stable `url/title/excerpt/date/tags`.
+Goal: find anything on the site without a server.
+In scope: build-time JSON index (`search.json`: url, title,
+excerpt, date, tags), a zero-config `/search/` page with a
+no-JS fallback (query param → pre-rendered results note) plus
+progressive-enhancement client filter; `check` validates the
+index covers every HTML route.
+Out of scope: hosted search (Algolia/Pagefind-style WASM),
+analytics, CMS integrations.
+Acceptance: fresh scaffold search finds a post by title, tag,
+and an excerpt word; index regenerates on `dev` rebuild;
+`docs/` documents the index schema.
+
+### 10.2 Image optimization
+
+Seam: `assets/` pipeline stays stage-shaped
+(decode → transform → emit → manifest).
+Goal: responsive modern images with zero config.
+In scope: WebP/AVIF variants + `srcset` widths for raster
+images in `assets/`, manifest records variants, templates get
+an `image` helper/filter emitting `<picture>`; pure-Crystal
+decoders only — no external CLI requirement.
+Out of scope: remote-image fetching, art direction UI,
+Tailwind/Sass/TypeScript (§10.5).
+Acceptance: PNG input emits original + WebP/AVIF + 3 widths;
+`check` warns on images missing dimensions; bench budget
+holds for a 50-image fixture.
+
+### 10.3 Plugin system
+
+Seam: pipeline stages take `(Context)` and return `(Result)`.
+Goal: user hooks without forking core.
+In scope: `Plugin` hook points (`before_build`, `after_render`,
+`after_build`), manifest discovery (`plugins/*.cr` compiled in
+or a `plombir.plugins.yml` list), documented hook API, error
+contract applies to plugin failures (file:line + fix hint).
+Out of scope: dynamic loading of uncompiled code, sandboxing,
+a plugin registry/marketplace.
+Acceptance: sample plugin (e.g. reading-time filter) installs
+in <5 min on a fresh scaffold; failing plugin reports which
+hook + file; core specs stay green with zero plugins loaded.
+
+### 10.4 Islands / interactivity (§15)
+
+Seam: `client:load|idle|visible`-shaped syntax reserved;
+renderer stays HTML-pure.
+Goal: opt-in hydration with no rewrite of static output.
+In scope: island directive parsing + passthrough, hydration
+loader stub, docs marking it experimental.
+Out of scope: a JS framework runtime, SSR, framework
+adapters (§10.6).
+Acceptance: page with zero islands emits zero JS bytes
+(§0 HTML-first gate holds); island page hydrates on load.
+
+### 10.5 Asset integrations (§25: Tailwind/Sass/TypeScript)
+
+Seam: `Plugins::AssetProcessor` interface stub-shaped; core
+never depends on Node.
+Goal: optional preprocessor support for those who want it.
+In scope: processor interface + one reference integration,
+missing-tool errors with install hints, `dev` watches source
+files.
+Out of scope: bundling Node into core, framework adapters.
+Acceptance: scaffold opts in via one config key; build fails
+with a fix-hint (not a stack trace) when the tool is absent.
+
+### 10.6 Framework adapters (React/Vue/Svelte)
+
+Seam: components stay HTML-first and framework-independent (§26).
+Goal: use framework components inside islands (§10.4).
+Out of scope until §10.4 lands: everything — this slice is
+blocked on islands.
+Acceptance: TBD in its ADR; renderer HTML-purity gate holds.
+
+### 10.7 Advanced schemas / i18n (+ taxonomy extensions)
+
+Seam: collections keep `schema?`, `permalink?`, `filter/sort`.
+v1 ships pagination (ADR-007), layout-gated taxonomies
+(ADR-008), `_data` files (ADR-009), `--future` + `import`
+(ADR-010); further extensions need ADRs.
+Goal: stricter content contracts + multi-locale sites.
+In scope: TBD in its ADR.
+Out of scope: machine translation, locale negotiation
+middleware (static hosts serve files).
+Acceptance: TBD in its ADR.
 
 ---
 ## 11. Cross-cutting specifications
@@ -555,14 +636,14 @@ MPL-2.0 stays in `LICENSE` + `shard.yml` + README footer. Every new dependency's
 | §9 Routing | §4 + §6 + §11.4 |
 | §10 Layouts / §11 Templates / §14 Components | §4 v0 → §7 v1 |
 | §12 Collections / §13 Schemas | §6 |
-| §15 Islands | §10 deferred |
-| §16 Assets / §17 Images | §8 (+ §10 deferred) |
+| §15 Islands | §10.4 |
+| §16 Assets / §17 Images | §8 (+ §10.2) |
 | §18 SEO / §19 RSS | §8 |
 | §20 Dev server / §22 Incremental | §5 |
 | §21 Pipeline | §4.2(6), §12.1 |
 | §23 `check` | §6 |
 | §24 Config | §6 + §11.3 |
-| §25 Plugins / §26 Framework-independence | §10 deferred + §12.2 |
+| §25 Plugins / §26 Framework-independence | §10.3 + §10.5/§10.6 + §12.2 |
 | §27 Crystal arch / §28 Deps | §12 |
 | §29 Errors | §11.2 + §9 audit |
 | §30 Testing | per-phase §Tests + §9 |
