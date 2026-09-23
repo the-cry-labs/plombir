@@ -1,6 +1,7 @@
 # Plombir::Check validates a site without publishing it (roadmap
-# Phase 3, item 4): five sections — content, routes, links, assets,
-# SEO-lite — each returning structured issues over a temp build.
+# Phase 3, item 4): six sections — content, routes, links, assets,
+# SEO-lite, search — each returning structured issues over a temp
+# build.
 #
 # Links, assets, and SEO run against a throwaway build in a temp
 # directory, so `check` never touches `dist/` and always inspects

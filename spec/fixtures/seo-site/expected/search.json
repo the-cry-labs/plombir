@@ -1,0 +1,23 @@
+[
+  {
+    "url": "/",
+    "title": "SEO Fixture",
+    "excerpt": "A short paragraph describing the homepage for search snippets.",
+    "date": "2026-09-13",
+    "tags": []
+  },
+  {
+    "url": "/posts/launch/",
+    "title": "Launch Day",
+    "excerpt": "We shipped the feed, the sitemap, and the head block.",
+    "date": "2026-09-10",
+    "tags": []
+  },
+  {
+    "url": "/posts/long/",
+    "title": "This title runs long on purpose to cross the sixty character line",
+    "excerpt": "Search results will truncate this one.",
+    "date": "2026-09-09",
+    "tags": []
+  }
+]

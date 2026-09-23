@@ -11,8 +11,8 @@ describe Plombir::CLI::Build do
 
       code.should eq(0)
       error.to_s.should be_empty
-      io.to_s.should contain("✓ Loaded 3 documents")
-      io.to_s.should contain("✓ Rendered 3 pages")
+      io.to_s.should contain("✓ Loaded 4 documents")
+      io.to_s.should contain("✓ Rendered 4 pages")
       io.to_s.should contain("✓ Processed 0 assets")
       io.to_s.should contain("Built in")
       io.to_s.should contain("Output: dist/")

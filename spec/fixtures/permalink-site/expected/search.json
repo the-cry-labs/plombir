@@ -1,0 +1,23 @@
+[
+  {
+    "url": "/",
+    "title": "Permalink index",
+    "excerpt": "Conventional URL.",
+    "date": "2026-09-13",
+    "tags": []
+  },
+  {
+    "url": "/blog/plain/",
+    "title": "Plain",
+    "excerpt": "Collection pattern URL.",
+    "date": "2026-02-01",
+    "tags": []
+  },
+  {
+    "url": "/custom/url/",
+    "title": "Custom",
+    "excerpt": "Explicit permalink.",
+    "date": "2026-09-13",
+    "tags": []
+  }
+]

@@ -8,7 +8,7 @@ describe Plombir::Build::Pipeline do
 
       result = Plombir::Build::Pipeline.run(Plombir::Build::Context.new(root))
 
-      result.pages.should eq(3)
+      result.pages.should eq(4)
       index = File.read(File.join(root, "dist", "index.html"))
       index.should contain("<main>")
       index.should contain("<h1>Welcome to site</h1>")

@@ -1,0 +1,110 @@
+[
+  {
+    "url": "/",
+    "title": "Test Blog",
+    "excerpt": "Ten published posts, two of them drafts. The list below comes from `collections.posts` — newest first, no custom code.",
+    "date": "2026-09-13",
+    "tags": []
+  },
+  {
+    "url": "/about/",
+    "title": "About",
+    "excerpt": "A fixture exercising collections, permalinks, excerpts, and schemas.",
+    "date": "2026-09-13",
+    "tags": []
+  },
+  {
+    "url": "/blog/2026/post-01/",
+    "title": "Post 01",
+    "excerpt": "Custom teaser one.",
+    "date": "2026-01-01",
+    "tags": [
+      "crystal",
+      "ssg"
+    ]
+  },
+  {
+    "url": "/blog/2026/post-02/",
+    "title": "Post 02",
+    "excerpt": "Teaser two.",
+    "date": "2026-01-02",
+    "tags": [
+      "crystal"
+    ]
+  },
+  {
+    "url": "/blog/2026/post-03/",
+    "title": "Post 03",
+    "excerpt": "Body text for post 03 with enough words to exercise the fallback excerpt path of the content model.",
+    "date": "2026-01-03",
+    "tags": [
+      "crystal"
+    ]
+  },
+  {
+    "url": "/blog/2026/post-04/",
+    "title": "Post 04",
+    "excerpt": "Body text for post 04 with enough words to exercise the fallback excerpt path of the content model.",
+    "date": "2026-01-04",
+    "tags": [
+      "meta"
+    ]
+  },
+  {
+    "url": "/blog/2026/post-05/",
+    "title": "Post 05",
+    "excerpt": "Body text for post 05 with enough words to exercise the fallback excerpt path of the content model.",
+    "date": "2026-01-05",
+    "tags": [
+      "crystal"
+    ]
+  },
+  {
+    "url": "/blog/2026/post-06/",
+    "title": "Post 06",
+    "excerpt": "Body text for post 06 with enough words to exercise the fallback excerpt path of the content model.",
+    "date": "2026-01-06",
+    "tags": [
+      "crystal",
+      "ssg"
+    ]
+  },
+  {
+    "url": "/blog/2026/post-08/",
+    "title": "Post 08",
+    "excerpt": "Body text for post 08 with enough words to exercise the fallback excerpt path of the content model.",
+    "date": "2026-01-08",
+    "tags": [
+      "crystal",
+      "ssg"
+    ]
+  },
+  {
+    "url": "/blog/2026/post-09/",
+    "title": "Post 09",
+    "excerpt": "Body text for post 09 with enough words to exercise the fallback excerpt path of the content model.",
+    "date": "2026-01-09",
+    "tags": [
+      "crystal"
+    ]
+  },
+  {
+    "url": "/blog/2026/post-10/",
+    "title": "Post 10",
+    "excerpt": "Body text for post 10 with enough words to exercise the fallback excerpt path of the content model.",
+    "date": "2026-01-10",
+    "tags": [
+      "crystal",
+      "ssg"
+    ]
+  },
+  {
+    "url": "/blog/2026/post-11/",
+    "title": "Post 11",
+    "excerpt": "Body text for post 11 with enough words to exercise the fallback excerpt path of the content model.",
+    "date": "2026-01-11",
+    "tags": [
+      "crystal"
+    ]
+  }
+]

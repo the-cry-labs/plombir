@@ -1,0 +1,23 @@
+[
+  {
+    "url": "/",
+    "title": "Hello",
+    "excerpt": "No frontmatter here.",
+    "date": "2026-09-13",
+    "tags": []
+  },
+  {
+    "url": "/naked/",
+    "title": "naked",
+    "excerpt": "Just text, no heading.",
+    "date": "2026-09-13",
+    "tags": []
+  },
+  {
+    "url": "/posts/plain/",
+    "title": "Plain post",
+    "excerpt": "Body without metadata.",
+    "date": "2026-09-13",
+    "tags": []
+  }
+]
