@@ -93,4 +93,4 @@ needs attention.
 ## `plombir version`
 
 Print the version plus the baked-in commit
-(`plombir 0.7.0 (336e3d4)`; `plombir --version` and `-V` work too).
+(`plombir 1.0.0 (336e3d4)`; `plombir --version` and `-V` work too).

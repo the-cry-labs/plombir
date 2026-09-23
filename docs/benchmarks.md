@@ -85,3 +85,19 @@ start), append a marker line to a page, and poll the served HTML
 until the marker appears (edit latency); the dev log line proves
 the incremental path (`↻ rebuilt index.md → / in 0ms`, no
 `(full)` marker).
+
+## Post-parity re-run (2026-09-23, pre-1.0)
+
+Release binary (`shards build --release`, Crystal 1.21.0) on the same
+Ryzen 7 8845HS, after the Jekyll-parity slices landed
+(pagination ADR-007, taxonomies ADR-008, data files ADR-009,
+future/import ADR-010). `scripts/bench.sh bin/plombir`:
+
+| Measurement | Result | Budget |
+|---|---|---|
+| minimal cold build (wall) | 7ms | <300ms |
+| 200-page cold build (wall) | 24ms | <1s |
+
+Both hold with 10–40× headroom — the parity features cost nothing
+when unused (pagination extras, taxonomy archives, and data vars all
+skip empty).
