@@ -1,6 +1,6 @@
 module Plombir
   module CLI
-    # Implements `plombir dev [--port 3000] [--host 127.0.0.1]`.
+    # Implements `plombir dev [--port 3000] [--host 127.0.0.1] [--future]`.
     #
     # Full initial build (plus dependency graph and cache), then serve
     # `dist/` while a watcher rebuilds only affected pages per batch.
@@ -10,7 +10,7 @@ module Plombir
       def self.text : String
         String.build do |io|
           io << "Usage:\n"
-          io << "  plombir dev [--port <n>] [--host <addr>]\n"
+          io << "  plombir dev [--port <n>] [--host <addr>] [--future]\n"
           io << "\n"
           io << "Build the site in the current directory, serve dist/,\n"
           io << "and rebuild affected pages when files change.\n"
@@ -18,6 +18,7 @@ module Plombir
           io << "Options:\n"
           io << "  --port <n>    Port to listen on (default: 3000)\n"
           io << "  --host <addr> Address to bind (default: 127.0.0.1)\n"
+          io << "  --future      Include posts dated after now\n"
           io << "\n"
           io << "Example:\n"
           io << "  plombir dev\n"
@@ -37,12 +38,13 @@ module Plombir
           return 0
         end
 
-        options = Serve.parse(args, DEFAULT_PORT, error, text)
+        options = Serve.parse(args.reject("--future"), DEFAULT_PORT, error, text)
         return 2 if options.nil?
 
         config = Plombir::Config.load_with_warnings(directory, error)
         output = config.build.output
-        context = Plombir::Build::Context.new(directory, output, false, config.schemas, config.permalink_patterns, config.site)
+        future = args.includes?("--future")
+        context = Plombir::Build::Context.new(directory, output, false, config.schemas, config.permalink_patterns, config.site, false, future)
         rebuilder = Plombir::Build::Incremental::Rebuilder.new(context)
         result = rebuilder.full
         Build.print_summary(result, io)
@@ -75,7 +77,7 @@ module Plombir
           rebuild_batch(rebuilder, batch, reloader, io, error)
         end
         0
-      rescue ex : Plombir::Build::Error | Plombir::Frontmatter::Error | Plombir::Router::Conflict | Plombir::Renderer::LayoutNotFound
+      rescue ex : Plombir::Build::Error | Plombir::Frontmatter::Error | Plombir::Router::Conflict | Plombir::Renderer::LayoutNotFound | Plombir::Content::Data::Error
         error.puts ex.message
         1
       rescue ex : Plombir::Config::Error
@@ -108,7 +110,7 @@ module Plombir
           end
         end
         reloader.notify
-      rescue ex : Plombir::Build::Error | Plombir::Frontmatter::Error | Plombir::Router::Conflict | Plombir::Renderer::LayoutNotFound
+      rescue ex : Plombir::Build::Error | Plombir::Frontmatter::Error | Plombir::Router::Conflict | Plombir::Renderer::LayoutNotFound | Plombir::Content::Data::Error
         error.puts ex.message
       rescue ex : Exception
         error.puts "✖ Rebuild failed\n\n#{ex.message}"

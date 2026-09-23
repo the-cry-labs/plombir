@@ -22,9 +22,10 @@ module Plombir
     # (`plombir build --drafts`), optional per-collection schema rules
     # (empty means no validation), optional collection permalink
     # patterns (empty means conventional URLs), the *site* metadata
-    # (`site.*` vars, canonical base, feed identity), and whether
-    # *minify* collapses safe HTML whitespace. The config loader fills
-    # all of these from `plombir.yml`.
+    # (`site.*` vars, canonical base, feed identity), whether
+    # *minify* collapses safe HTML whitespace, and whether dated
+    # -*future* posts are included (`plombir build --future`). The
+    # config loader fills all of these from `plombir.yml`.
     struct Context
       getter root : String
       getter output : String
@@ -33,6 +34,7 @@ module Plombir
       getter patterns : Hash(String, String)
       getter site : Config::Site
       getter minify : Bool
+      getter future : Bool
 
       def initialize(
         @root : String = Dir.current,
@@ -42,6 +44,7 @@ module Plombir
         @patterns : Hash(String, String) = {} of String => String,
         @site : Config::Site = Config::Site.new,
         @minify : Bool = false,
+        @future : Bool = false,
       )
       end
 
@@ -168,11 +171,20 @@ module Plombir
       # through `discover` + `resolve` + `render_one` without rerunning
       # the full pipeline.
       def self.discover(context : Context) : Array(Entry)
+        now = Time.utc
         Content.discover(context.root, drafts: true).compact_map do |page|
           document = Frontmatter.parse(File.read(page.source_path), page.relative_path)
           next nil if (page.draft || document.draft?) && !context.drafts
+          next nil if !context.future && future?(document, page.mtime, now)
           Entry.new(page, document)
         end
+      end
+
+      # Whether the page is dated after *now* (see ADR-010). Invalid
+      # dates raise the usual `Frontmatter::Error` — never silently kept.
+      private def self.future?(document : Frontmatter::Document, mtime : Time, now : Time) : Bool
+        date = document.date(mtime)
+        !date.nil? && date > now
       end
 
       # Maps every entry to its pretty URL, raising `Router::Conflict`
